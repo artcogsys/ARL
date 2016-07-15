@@ -5,10 +5,31 @@ import matplotlib.pyplot as plt
 ###
 # Base class for an environment
 
-# class QLearner(object):
+class Environment(object):
+
+    def reset(self):
+        pass
+
+    def step(self, action):
+        pass
+
+    def render(self):
+        pass
+
+    def get_ground_truth(self):
+        pass
+
+    def set_ground_truth(self, ground_truth):
+        pass
+
+    def generate(self):
+        pass
 
 
-class Foo(object):
+###
+# Specific environments
+
+class Foo(Environment):
     """
     Very simple environment for testing fully observed models. The actor gets a reward when it correctly decides
     on the ground truth. Ground truth 0/1 determines probabilistically the number of 0s or 1s on the output
@@ -21,6 +42,8 @@ class Foo(object):
             n: number of inputs
             p: probability of emitting the right sensation at the input
         """
+
+        super(Foo, self).__init__()
 
         self.ninput = n
         self.p = p
@@ -65,7 +88,7 @@ class Foo(object):
 
         self.state = ground_truth
 
-class ProbabilisticCategorization(object):
+class ProbabilisticCategorization(Environment):
     """
 
     Formerly known as PerceptualDecision task
@@ -98,6 +121,8 @@ class ProbabilisticCategorization(object):
         :param: odds : determines odds ratio
 
         """
+
+        super(ProbabilisticCategorization, self).__init__()
 
         self.odds = np.array(odds)
 
@@ -173,7 +198,7 @@ class ProbabilisticCategorization(object):
         return obs, reward, done
 
 
-class WeatherPrediction(object):
+class WeatherPrediction(Environment):
     """
 
     Classical weather prediction task
@@ -188,7 +213,7 @@ class WeatherPrediction(object):
 
     pass
 
-class RandomDotMotion(object):
+class RandomDotMotion(Environment):
     """
     Prototype for the Random Dot Motion environment that should be replaced by the
     actually chosen experimental framework. 
@@ -215,6 +240,8 @@ class RandomDotMotion(object):
         Percentage of coherent dots: SimpleMotionCoherence.get_coherence()
         
         """
+
+        super(RandomDotMotion, self).__init__()
 
         if isinstance(coherence,list):
             self.coherence = coherence
