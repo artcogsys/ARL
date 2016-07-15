@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+import scipy
 
 ###
 # Base class for an environment
@@ -135,7 +136,7 @@ class ProbabilisticCategorization(Environment):
         self.rewards = [-1, 10, -100]
 
         # normalize rewards
-        self.rewards = np.array(self.rewards) / float(np.sum(np.array(self.rewards)))
+        self.rewards = np.array(self.rewards) / float(np.max(np.abs(self.rewards)))
 
         self.reset()
 
@@ -282,7 +283,7 @@ class RandomDotMotion(Environment):
         self.rewards = [-1, 10, -100]
 
         # normalize rewards
-        self.rewards = np.array(self.rewards) / float(np.sum(np.array(self.rewards)))
+        self.rewards = np.array(self.rewards) / float(np.max(np.abs(self.rewards)))
 
         # Now initialize the dots with above parameters:
         self.reset()

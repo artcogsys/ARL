@@ -12,7 +12,7 @@ from arl import *
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 3*10**3 # number training iterations
+train_iter = 10**4 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########

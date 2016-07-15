@@ -78,7 +78,7 @@ class A2C(Agent):
         self.shared_model = None
 
         # maximal number of accumulation steps
-        self.t_max = 5
+        self.t_max = 10
 
         # entropy parameter
         self.beta = 1e-2
