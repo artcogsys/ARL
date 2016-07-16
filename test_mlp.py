@@ -18,7 +18,7 @@ from arl import *
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 5*10**3 # number training iterations
+train_iter = 10**4 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
@@ -34,8 +34,8 @@ env = environments.ProbabilisticCategorization(odds)
 ###########
 # Actor and critic specification
 
-nhidden = 10
-nframes = 5
+nhidden = 20
+nframes = 10
 model = mz.MLP(env.ninput, nhidden, env.noutput, nframes=nframes)
 
 ###########

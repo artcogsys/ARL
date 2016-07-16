@@ -12,7 +12,7 @@ from arl import *
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 10**4 # number training iterations
+train_iter = 3*10**4 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
@@ -24,6 +24,7 @@ test_iter = 10**3 # number test iterations
 
 odds = [0.25, 0.5, 2, 4]
 #odds = [0.5, 0.9, 0.9, 1.1, 1.1, 2]
+#odds = [0.5, 2]
 env = environments.ProbabilisticCategorization(odds)
 
 ###########
