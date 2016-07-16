@@ -18,9 +18,9 @@ test_iter = 10**3 # number test iterations
 ###########
 # Environment specification
 
-ndots = 1
-pixwidth = 3
-coherence = 1 # [0.1, 0.9]  # will be selected from with random.choice()
+ndots = 100
+pixwidth = 20
+coherence = 0.5 #1 # [0.1, 0.9]  # will be selected from with random.choice()
 
 env = environments.RandomDotMotion(n_dots = ndots, speed = 1, coherence = coherence, pixwidth=pixwidth, flatten = False,
                                    circular = False)
