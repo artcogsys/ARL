@@ -262,11 +262,7 @@ class RandomDotMotion(Environment):
             
         self.central_pos = self.pixwidth / 2.
 
-        self.lifetime_dots = 10    # frames
-
         self.speed = speed   # pix / frame
-
-        self.display_refresh_rate = 60
 
         if self.pixwidth**2 < self.n_dots:
             sys.exit("Please use a valid number of dots.")
@@ -308,7 +304,6 @@ class RandomDotMotion(Environment):
         self.state = ground_truth
 
     def get_coherence(self):
-
         return np.rint(self.p_coherent * 100.0).astype(int)
 
 
@@ -318,8 +313,8 @@ class RandomDotMotion(Environment):
         #self.obs_screen.fill(0)  # fill screen with blanks
 
         for dot_i in xrange(self.n_dots):
-            #x,y = np.rint( self.dots_pos_xy[:,dot_i] ).astype(int)  # round position to nearest integer
-            x,y = int(self.dots_pos_xy[0,dot_i]), int(self.dots_pos_xy[1,dot_i])
+            #x,y = np.rint( self.dots_pos_xy[:,dot_i] ).astype(int)  # round position to nearest integer            
+            x,y = np.int(self.dots_pos_xy[0,dot_i]), int(self.dots_pos_xy[1,dot_i])
             self.obs_screen[y,x] = 1.0
 
         # make zero centered
@@ -336,8 +331,8 @@ class RandomDotMotion(Environment):
         # get random distance from center and random position angle: 
         angle = 2. * np.pi * np.random.rand()
         dist_from_center =  self.circle_radius * np.sqrt(np.random.rand())
-        x = np.floor(self.central_pos + dist_from_center * np.sin(angle))
-        y = np.floor(self.central_pos + dist_from_center * np.cos(angle))  # init at exact position
+        x = np.mod(self.central_pos + dist_from_center * np.sin(angle), self.pixwidth)
+        y = np.mod(self.central_pos + dist_from_center * np.cos(angle), self.pixwidth)  # init at exact position
         return [x,y]
 
 
@@ -368,7 +363,7 @@ class RandomDotMotion(Environment):
                 motion_angle = self.motiondirection
             else:    # this is a randomly moving dot
                 motion_angle = 2. * np.pi * np.random.rand()
-                
+
             # update dot position: 
             self.dots_pos_xy[:,dot_i] = [ self.dots_pos_xy[0,dot_i] + np.sin(motion_angle) * self.speed,
                                           self.dots_pos_xy[1,dot_i] + np.cos(motion_angle) * self.speed]
@@ -378,8 +373,8 @@ class RandomDotMotion(Environment):
                 is_outside = ( ( (self.central_pos - self.dots_pos_xy[0,dot_i])**2 + 
                                  (self.central_pos - self.dots_pos_xy[1,dot_i])**2 ) > self.circle_radius**2 )
             else:
-                is_outside = ( not (0.0 <= self.dots_pos_xy[0,dot_i] < self.pixwidth ) or
-                               not (0.0 <= self.dots_pos_xy[0,dot_i] < self.pixwidth ) )
+                is_outside = ( not (0.0 <= self.dots_pos_xy[0,dot_i] < float(self.pixwidth) ) or
+                               not (0.0 <= self.dots_pos_xy[1,dot_i] < float(self.pixwidth) ) )
 
             if is_outside: 
                 self.dots_pos_xy[:,dot_i] = self.init_dot()
