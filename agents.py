@@ -241,10 +241,10 @@ class A2C(Agent):
         """
 
         # get output of actor model for this observation
-        pi, _ = self.model(obs)
+        pi, v = self.model(obs)
 
         # generate action according to policy
         p = F.softmax(pi).data[0]
 
         # return action chosen according to stochastic policy
-        return np.random.choice(self.noutput, None, True, p)
+        return np.random.choice(self.noutput, None, True, p), pi, v

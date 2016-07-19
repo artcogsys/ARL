@@ -46,29 +46,34 @@ arl = ARL(agent)
 ###########
 # Learn model
 
-loss = arl.learn(train_iter)
+learn = False
+if learn:
 
-# We can also just load an existing model
-# arl.load(name)
+    loss = arl.learn(train_iter)
 
-###########
-# Save model
+    ###########
+    # Save model
 
-arl.save(name)
+    arl.save(name)
 
-###########
-# plot log loss
+    ###########
+    # plot log loss
 
-plt.plot(np.arange(len(loss)), loss, 'k')
-plt.xlabel('iteration')
-plt.ylabel('loss')
-plt.savefig('figures/' + name + '__loss.png')
-plt.close()
+    plt.plot(np.arange(len(loss)), loss, 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.savefig('figures/' + name + '__loss.png')
+    plt.close()
+
+else:
+
+    # We can also just load an existing model
+    arl.load(name)
 
 ###########
 # Run agent
 
-rewards = arl.run(test_iter)
+rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = arl.run(test_iter)
 
 ##########
 # visualize results
@@ -81,3 +86,35 @@ plt.ylabel('cumulative reward')
 plt.savefig('figures/' + name + '__reward.png')
 plt.close()
 
+###########
+# Simulate agent
+
+rewards2, done2, log_prob2, value2, entropy2, internal2 = arl.simulate(ground_truth, observations, actions)
+
+##########
+# visualize results
+
+# sanity check
+plt.plot(range(len(rewards2)), np.cumsum(rewards2), 'k')
+plt.xlabel('iteration')
+plt.ylabel('cumulative reward')
+plt.savefig('figures/' + name + '__reward2.png')
+plt.close()
+
+plt.plot(range(len(log_prob2)), log_prob2, 'k')
+plt.xlabel('iteration')
+plt.ylabel('log probability')
+plt.savefig('figures/' + name + '__log_prob2.png')
+plt.close()
+
+plt.plot(range(len(log_prob2)), log_prob2, 'k')
+plt.xlabel('iteration')
+plt.ylabel('log probability')
+plt.savefig('figures/' + name + '__entropy2.png')
+plt.close()
+
+plt.plot(range(len(value2)), value2, 'k')
+plt.xlabel('iteration')
+plt.ylabel('value')
+plt.savefig('figures/' + name + '__value2.png')
+plt.close()
