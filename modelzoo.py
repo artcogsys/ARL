@@ -198,8 +198,10 @@ class RNN(Chain):
         self.l1.h = _h
 
     def unchain_backward(self):
-        self.l1.h.unchain_backward()
-        self.l1.c.unchain_backward()
+        if not self.l1.h is None:
+            self.l1.h.unchain_backward()
+        if not self.l1.c is None:
+            self.l1.c.unchain_backward()
 
 
 class CRNN(Chain):
@@ -250,5 +252,7 @@ class CRNN(Chain):
         self.l2.h = _h
 
     def unchain_backward(self):
-        self.l2.h.unchain_backward()
-        self.l2.c.unchain_backward()
+        if not self.l2.h is None:
+            self.l2.h.unchain_backward()
+        if not self.l2.c is None:
+            self.l2.c.unchain_backward()

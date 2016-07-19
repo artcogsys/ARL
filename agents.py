@@ -161,6 +161,9 @@ class A2C(Agent):
                 # perform action via actor and receive new observations and reward
                 obs, reward, done = self.environment.step(action)
 
+                # if done:
+                #     self.model.reset()
+
                 # No reward clipping; will lead to random guessing as best option for our environment
                 # reward = np.clip(reward, -1, 1)
 
@@ -343,7 +346,7 @@ class A2C(Agent):
                 observations[i + 1] = obs
                 ground_truth[i + 1] = env.get_ground_truth()
 
-            # if done:
+            # if done[i]:
             #     self.model.reset()
 
         return rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal
@@ -422,7 +425,7 @@ class A2C(Agent):
                 env.set_ground_truth(ground_truth[i + 1])
                 obs = observations[i + 1].reshape(obs_shape)
 
-            # if done:
+            # if done[i]:
             #     self.model.reset()
 
         return rewards, done, log_prob, entropy, value, internal
