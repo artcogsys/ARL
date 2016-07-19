@@ -2,6 +2,8 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import scipy
+from scipy.io import savemat
+
 
 ###
 # Base class for an environment
@@ -197,6 +199,36 @@ class ProbabilisticCategorization(Environment):
             obs = self.reset()
 
         return obs, reward, done
+
+
+    def generate(self, num_steps, num_obs_per_step, outfilename = ""):    
+        print "Generating sequence of", str(num_steps), "steps and", str(num_obs_per_step), "observations."
+
+        gen_seq = np.zeros([num_steps, num_obs_per_step + 1 ])
+
+        for step in xrange(num_steps):
+            # [0] entry will store the current system state / right answer: 
+            gen_seq[step, 0] = self.get_ground_truth()   # 1 or 2
+
+            for obs_idx in xrange(1, num_obs_per_step+1):
+                obs, _, done = self.step(0)
+                # there is only one nonzero index: 
+                symbol_idx = np.nonzero(obs[0])[0] + 1   # start counting symbols from 1
+                gen_seq[step, obs_idx] = symbol_idx   # 1-4
+
+            # right answer to generate next trial:
+            _, _, done = self.step(gen_seq[step, 0])
+        
+            assert( done==True )
+        
+            if step % 100 == 0:
+                print str(step), "of", str(num_steps), "trials drawn."
+        
+        if outfilename != "":
+            savemat(outfilename, {'gen_seq':gen_seq})
+
+        return gen_seq
+
 
 
 class WeatherPrediction(Environment):
