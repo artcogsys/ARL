@@ -2,6 +2,7 @@ import numpy as np
 from chainer import optimizers, Variable
 import chainer.functions as F
 from asynchronous import RMSpropAsync
+from chainer import serializers
 
 def copy_param(target_link, source_link):
     """Copy parameters of a link to another link.
@@ -55,6 +56,20 @@ class Agent(object):
     def learn(self, niter):
         return [np.nan]
 
+    def save(self, name):
+        """
+        Save model
+        """
+
+        serializers.save_npz('models/{0}.model'.format(name), self.model)
+
+    def load(self, name):
+        """
+        Load model
+        """
+
+        serializers.load_npz('models/{0}.model'.format(name), self.model)
+
 
 class A2C(Agent):
     """
@@ -98,19 +113,19 @@ class A2C(Agent):
         Args:
             niter: number of training iterations (T_max in A3C paper)
 
-        Returns: loss
+        Returns: loss and times at which loss was acquired
 
         """
 
         # reset the environment and get observation
         obs = self.environment.reset()
 
-        losses = []
-
         # create trajectory of learning rates
         learning_rates = np.linspace(self.optimizer.lr, 0, niter, False)
 
         # outer training loop
+        losses = []
+        ts = []
         t_start = t = 0
         while True:
 
@@ -228,8 +243,9 @@ class A2C(Agent):
             # rough indication of how the loss changes
             print '{0}; {1}; {2:03.5f}'.format(t, self.name, loss.data[0])
             losses.append(loss.data[0])
+            ts.append(t)
 
-        return losses
+        return [ts, losses]
 
     def act(self, obs):
         """
@@ -248,3 +264,165 @@ class A2C(Agent):
 
         # return action chosen according to stochastic policy
         return np.random.choice(self.noutput, None, True, p), pi, v
+
+    def run(self, test_iter):
+        """
+
+        Args:
+            test_iter: number of test iterations
+
+        Returns:
+            rewards: reward for each time point
+            ground_truth: ground truth state for each time point
+            observations: observation for each time point
+            actions: selected action for each time point
+            terminal: whether or not we are in a terminal (done) state for each time point
+            log_prob: Output of the actor (log probability of selected action)
+            entropy: Entropy of the stochastic policy according to the actor
+            value: Output of the critic (estimated value according to current state of the model)
+            internal: internal states (hidden units)
+        """
+
+        ground_truth = np.zeros([test_iter, 1], dtype=np.float32)
+
+        observations = np.zeros(np.hstack([test_iter, self.ninput]), dtype=np.float32)
+        observations[:] = np.nan
+
+        actions = np.zeros([test_iter, 1], dtype=np.uint8)
+        actions[:] = np.nan
+
+        rewards = np.zeros([test_iter, 1], dtype=np.float32)
+        rewards[:] = np.nan
+
+        log_prob = np.zeros([test_iter, 1], dtype=np.float32)
+        log_prob[:] = np.nan
+
+        entropy = np.zeros([test_iter, 1], dtype=np.float32)
+        entropy[:] = np.nan
+
+        value = np.zeros([test_iter, 1], dtype=np.float32)
+        value[:] = np.nan
+
+        done = np.zeros([test_iter, 1], dtype=np.bool)
+
+        internal = []
+
+        ###
+        # Start run
+
+        env = self.environment
+
+        # initialize environment; this generates a ground truth
+        obs = env.reset()
+        observations[0] = obs
+
+        ground_truth[0] = env.get_ground_truth()
+
+        # reset agent
+        self.model.reset()
+
+        for i in xrange(test_iter):
+
+            # generate action using actor model
+            actions[i], pi, v = self.act(obs)
+
+            p = F.softmax(pi)
+            action = np.random.choice(env.noutput, None, True, p.data[0])
+            actions[i] = action
+            logp = F.log_softmax(pi)
+            log_prob[i] = F.select_item(logp, Variable(np.asarray([action], dtype=np.int32))).data
+            entropy[i] = - F.sum(p * logp, axis=1).data
+
+            # value according to critic
+            value[i] = v.data
+
+            # Perform action and receive new observations and reward
+            obs, rewards[i], done[i] = env.step(actions[i])
+
+            if i < test_iter - 1:
+                observations[i + 1] = obs
+                ground_truth[i + 1] = env.get_ground_truth()
+
+            # if done:
+            #     self.model.reset()
+
+        return rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal
+
+
+    def simulate(self, ground_truth, observations, actions):
+        """
+
+        Args:
+                ground_truth: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+                observations: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+                actions: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+                internal_states: whether or not to return internal states
+
+        Returns:
+            rewards: reward for each time point
+            terminal: whether or not we are in a terminal (done) state for each time point
+            log_prob: Output of the actor (log probability of selected action)
+            entropy: Entropy of the stochastic policy according to the actor
+            value: Output of the critic (estimated value according to current state of the model)
+            internal: internal states (hidden units)
+        """
+
+        test_iter = ground_truth.shape[0]
+
+        rewards = np.zeros([test_iter, 1], dtype=np.float32)
+        rewards[:] = np.nan
+
+        log_prob = np.zeros([test_iter, 1], dtype=np.float32)
+        log_prob[:] = np.nan
+
+        entropy = np.zeros([test_iter, 1], dtype=np.float32)
+        entropy[:] = np.nan
+
+        value = np.zeros([test_iter, 1], dtype=np.float32)
+        value[:] = np.nan
+
+        done = np.zeros([test_iter, 1], dtype=np.bool)
+
+        internal = []
+
+        ###
+        # Start run
+
+        env = self.environment
+
+        # initialize environment
+        obs = env.reset()
+        obs_shape = obs.shape
+        obs = observations[0].reshape(obs_shape)
+
+        # force ground truth to be the same as that of the behavioural data
+        env.set_ground_truth(ground_truth[0])
+
+        # reset agent
+        self.model.reset()
+
+        for i in xrange(test_iter):
+
+            # generate action using actor model
+            action, pi, v = self.act(obs)
+
+            p = F.softmax(pi)
+            logp = F.log_softmax(pi)
+            log_prob[i] = F.select_item(logp, Variable(np.asarray([actions[i, 0]], dtype=np.int32))).data
+            entropy[i] = - F.sum(p * logp, axis=1).data
+
+            # value according to critic
+            value[i] = v.data
+
+            # Perform action and receive new observations and reward
+            _, rewards[i], done[i] = env.step(actions[i])
+
+            # For the last step we don't have an observation or ground truth (end of experiment)
+            if i < test_iter - 1:
+                env.set_ground_truth(ground_truth[i + 1])
+                obs = observations[i + 1].reshape(obs_shape)
+
+            # if done:
+            #     self.model.reset()
+
+        return rewards, done, log_prob, entropy, value, internal

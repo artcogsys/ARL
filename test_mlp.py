@@ -6,12 +6,6 @@ import agents
 import matplotlib.pyplot as plt
 from arl import *
 
-# action probabilities go to 1
-# entropy should encourage exploration
-# read standard advantage actor critic
-# check website silver
-# seems it has no time to figure out right policy
-
 ###########
 # Parameter specification
 
@@ -51,12 +45,14 @@ arl = ARL(agent)
 ###########
 # Learn model
 
-loss = arl.learn(train_iter)
+losses, agent = arl.learn(train_iter)
 
 ###########
-# plot log loss
+# plot log loss for one worker
+ts = losses[losses.keys()[0]][0]
+loss = losses[losses.keys()[0]][1]
 
-plt.plot(np.arange(len(loss)), loss, 'k')
+plt.plot(ts, loss, 'k')
 plt.xlabel('iteration')
 plt.ylabel('loss')
 plt.savefig('figures/' + name + '__loss.png')
@@ -71,7 +67,7 @@ plt.close()
 
 # ground_truth, observations, actions, rewards, qvalues, terminal, internal = agent.run(test_iter)
 
-rewards = arl.run(test_iter)
+rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = agent.run(test_iter)
 
 ##########
 # visualize results

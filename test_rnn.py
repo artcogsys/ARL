@@ -9,6 +9,9 @@ from arl import *
 ###########
 # Parameter specification
 
+# learn model
+learn = False
+
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -46,20 +49,21 @@ arl = ARL(agent)
 ###########
 # Learn model
 
-learn = False
 if learn:
 
-    loss = arl.learn(train_iter)
+    losses, agent = arl.learn(train_iter)
 
     ###########
     # Save model
 
-    arl.save(name)
+    agent.save(name)
 
     ###########
-    # plot log loss
+    # plot log loss for one worker
+    ts = losses[losses.keys()[0]][0]
+    loss = losses[losses.keys()[0]][1]
 
-    plt.plot(np.arange(len(loss)), loss, 'k')
+    plt.plot(ts, loss, 'k')
     plt.xlabel('iteration')
     plt.ylabel('loss')
     plt.savefig('figures/' + name + '__loss.png')
@@ -68,12 +72,12 @@ if learn:
 else:
 
     # We can also just load an existing model
-    arl.load(name)
+    agent.load(name)
 
 ###########
 # Run agent
 
-rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = arl.run(test_iter)
+rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = agent.run(test_iter)
 
 ##########
 # visualize results
@@ -89,7 +93,7 @@ plt.close()
 ###########
 # Simulate agent
 
-rewards2, done2, log_prob2, value2, entropy2, internal2 = arl.simulate(ground_truth, observations, actions)
+rewards2, done2, log_prob2, value2, entropy2, internal2 = agent.simulate(ground_truth, observations, actions)
 
 ##########
 # visualize results
