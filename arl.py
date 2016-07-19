@@ -145,6 +145,20 @@ class ARL(object):
             # just return loss of the first worker
             return losses[losses.keys()[0]]
 
+    def save(self, name):
+        """
+        Save model
+        """
+
+        serializers.save_npz('models/{0}.model'.format(name), self.agent.model)
+
+    def load(self, name):
+        """
+        Load model
+        """
+
+        serializers.load_npz('models/{0}.model'.format(name), self.agent.model)
+
     def run(self, test_iter):
         # determine some parameters
 

@@ -48,6 +48,14 @@ arl = ARL(agent)
 
 loss = arl.learn(train_iter)
 
+# We can also just load an existing model
+# arl.load(name)
+
+###########
+# Save model
+
+arl.save(name)
+
 ###########
 # plot log loss
 
