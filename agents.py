@@ -152,7 +152,6 @@ class A2C(Agent):
                 # generate action according to policy
                 p = F.softmax(pi)
                 action = np.random.choice(self.noutput, None, True, p.data[0])
-                # print p.data
 
                 # store log probability of the action which was selected
                 logp = F.log_softmax(pi)
@@ -334,6 +333,7 @@ class A2C(Agent):
             actions[i] = action
             logp = F.log_softmax(pi)
             log_prob[i] = F.select_item(logp, Variable(np.asarray([action], dtype=np.int32))).data
+
             entropy[i] = - F.sum(p * logp, axis=1).data
 
             # value according to critic
@@ -348,6 +348,24 @@ class A2C(Agent):
 
             # if done[i]:
             #     self.model.reset()
+
+        # COMPUTE R AND ADVANTAGE; DOUbLE CHECK INDEXING
+
+        # if done[i]:
+        #     R = 0
+        # else:
+        #     _, vout = self.model(obs, persistent=True)
+        #     R = float(vout.data)
+        #
+        # for i in range(test_iter, -1, -1):
+        #
+        #     # ESTIMATE OF Q^pi(A,S)
+        #     R = rewards[i] + self.gamma * R
+        #
+        #     v = self.past_values[i]
+        #
+        #     # Compute advantage of action performed in this state
+        #     advantage[i] = R - v
 
         return rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal
 

@@ -6,6 +6,9 @@ import agents
 import matplotlib.pyplot as plt
 from arl import *
 
+## ADD PREDICTION ERROR TO SIMULATION OUTPUT; HOW ABOUT SURPRISAL ETC; HOW TO DO THIS IN A BETTER WAY?
+## GIVE NETWORK ABILITY TO LEARN ON DATA ACQUIRED BY SUBJECT
+
 ###########
 # Parameter specification
 
