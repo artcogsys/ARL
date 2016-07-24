@@ -146,16 +146,10 @@ class A2C(Agent):
                 # store observation
                 self.past_states[idx] = obs
 
-                # get output of actor-critic model for this observation
-                pi, v = self.model(obs)
+                # generate action using actor model
+                action, pi, v = self.act(obs)
 
-                # generate action according to policy
-                p = F.softmax(pi)
-                action = np.random.choice(self.noutput, None, True, p.data[0])
-
-                # store log probability of the action which was selected
-                logp = F.log_softmax(pi)
-                self.past_action_log_prob[idx] = F.select_item(logp, Variable(np.asarray([action], dtype=np.int32)))
+                self.past_action_log_prob[idx] = self.log_prob(action, pi)
 
                 # perform action via actor and receive new observations and reward
                 obs, reward, done = self.environment.step(action)
@@ -171,7 +165,7 @@ class A2C(Agent):
                 self.past_values[idx] = v
 
                 # compute entropy
-                self.past_action_entropy[idx] = - F.sum(p * logp, axis=1)
+                self.past_action_entropy[idx] = self.entropy(pi)
 
                 t += 1
 
@@ -267,7 +261,35 @@ class A2C(Agent):
         # return action chosen according to stochastic policy
         return np.random.choice(self.noutput, None, True, p), pi, v
 
-    def run(self, test_iter):
+    def entropy(self,pi):
+        """
+
+        Args:
+            pi: stochastic policy
+
+        Returns: entropy of the stochastic policy
+
+        """
+        p = F.softmax(pi)
+        logp = F.log_softmax(pi)
+
+        return - F.sum(p * logp, axis=1)
+
+    def log_prob(self, action, pi):
+        """
+
+        Args:
+            action: selected action
+            pi: stochastic policy
+
+        Returns: log probability of selected action
+
+        """
+
+        logp = F.log_softmax(pi)
+        return F.select_item(logp, Variable(np.asarray([action], dtype=np.int32)))
+
+    def simulate(self, test_iter):
         """
 
         Args:
@@ -278,11 +300,7 @@ class A2C(Agent):
             ground_truth: ground truth state for each time point
             observations: observation for each time point
             actions: selected action for each time point
-            terminal: whether or not we are in a terminal (done) state for each time point
-            log_prob: Output of the actor (log probability of selected action)
-            entropy: Entropy of the stochastic policy according to the actor
-            value: Output of the critic (estimated value according to current state of the model)
-            internal: internal states (hidden units)
+            done: whether or not we are in a terminal (done) state for each time point
         """
 
         ground_truth = np.zeros([test_iter, 1], dtype=np.float32)
@@ -296,18 +314,7 @@ class A2C(Agent):
         rewards = np.zeros([test_iter, 1], dtype=np.float32)
         rewards[:] = np.nan
 
-        log_prob = np.zeros([test_iter, 1], dtype=np.float32)
-        log_prob[:] = np.nan
-
-        entropy = np.zeros([test_iter, 1], dtype=np.float32)
-        entropy[:] = np.nan
-
-        value = np.zeros([test_iter, 1], dtype=np.float32)
-        value[:] = np.nan
-
         done = np.zeros([test_iter, 1], dtype=np.bool)
-
-        internal = []
 
         ###
         # Start run
@@ -328,17 +335,6 @@ class A2C(Agent):
             # generate action using actor model
             actions[i], pi, v = self.act(obs)
 
-            p = F.softmax(pi)
-            action = np.random.choice(env.noutput, None, True, p.data[0])
-            actions[i] = action
-            logp = F.log_softmax(pi)
-            log_prob[i] = F.select_item(logp, Variable(np.asarray([action], dtype=np.int32))).data
-
-            entropy[i] = - F.sum(p * logp, axis=1).data
-
-            # value according to critic
-            value[i] = v.data
-
             # Perform action and receive new observations and reward
             obs, rewards[i], done[i] = env.step(actions[i])
 
@@ -349,43 +345,28 @@ class A2C(Agent):
             # if done[i]:
             #     self.model.reset()
 
-        # COMPUTE R AND ADVANTAGE; DOUbLE CHECK INDEXING
-
-        # if done[i]:
-        #     R = 0
-        # else:
-        #     _, vout = self.model(obs, persistent=True)
-        #     R = float(vout.data)
-        #
-        # for i in range(test_iter, -1, -1):
-        #
-        #     # ESTIMATE OF Q^pi(A,S)
-        #     R = rewards[i] + self.gamma * R
-        #
-        #     v = self.past_values[i]
-        #
-        #     # Compute advantage of action performed in this state
-        #     advantage[i] = R - v
-
-        return rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal
+        return rewards, ground_truth, observations, actions, done
 
 
-    def simulate(self, ground_truth, observations, actions):
+    def analyze(self, ground_truth, observations, actions):
         """
 
         Args:
                 ground_truth: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
                 observations: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
                 actions: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
-                internal_states: whether or not to return internal states
 
         Returns:
-            rewards: reward for each time point
-            terminal: whether or not we are in a terminal (done) state for each time point
+            rewards: Can be used for sanity checking (does analysis yield same reward trajectory as experiment?)
             log_prob: Output of the actor (log probability of selected action)
             entropy: Entropy of the stochastic policy according to the actor
             value: Output of the critic (estimated value according to current state of the model)
-            internal: internal states (hidden units)
+            returns: The expected return at each point in time
+            hidden: internal states (hidden units)
+
+
+        Note 1: Advantage is easily computed as returns - value
+        Note 2: Squared advantage could be a measure of surprise?
         """
 
         test_iter = ground_truth.shape[0]
@@ -402,9 +383,10 @@ class A2C(Agent):
         value = np.zeros([test_iter, 1], dtype=np.float32)
         value[:] = np.nan
 
-        done = np.zeros([test_iter, 1], dtype=np.bool)
+        returns = np.zeros([test_iter, 1], dtype=np.float32)
+        returns[:] = np.nan
 
-        internal = []
+        hidden = []
 
         ###
         # Start run
@@ -427,23 +409,38 @@ class A2C(Agent):
             # generate action using actor model
             action, pi, v = self.act(obs)
 
-            p = F.softmax(pi)
-            logp = F.log_softmax(pi)
-            log_prob[i] = F.select_item(logp, Variable(np.asarray([actions[i, 0]], dtype=np.int32))).data
-            entropy[i] = - F.sum(p * logp, axis=1).data
+            log_prob[i] = self.log_prob(action, pi).data
 
-            # value according to critic
+            # perform action via actor and receive new observations and reward
+            obs, reward, done = self.environment.step(actions[i])
+
+            # if done:
+            #     self.model.reset()
+
+            # No reward clipping; will lead to random guessing as best option for our environment
+            # reward = np.clip(reward, -1, 1)
+
+            # store reward and value
+            rewards[i] = reward
             value[i] = v.data
 
-            # Perform action and receive new observations and reward
-            _, rewards[i], done[i] = env.step(actions[i])
+            # compute entropy
+            entropy[i] = self.entropy(pi).data
 
             # For the last step we don't have an observation or ground truth (end of experiment)
             if i < test_iter - 1:
                 env.set_ground_truth(ground_truth[i + 1])
                 obs = observations[i + 1].reshape(obs_shape)
 
-            # if done[i]:
-            #     self.model.reset()
+        if done:
+            R = 0
+        else:
+            _, vout = self.model(obs, persistent=True)
+            R = float(vout.data)
 
-        return rewards, done, log_prob, entropy, value, internal
+        for i in range(test_iter-1, -1, -1):
+
+            R = rewards[i] + self.gamma * R
+            returns[i] = R
+
+        return rewards, log_prob, entropy, value, returns, hidden

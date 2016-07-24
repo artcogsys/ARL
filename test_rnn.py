@@ -80,7 +80,7 @@ else:
 ###########
 # Run agent
 
-rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = agent.run(test_iter)
+rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
 ##########
 # visualize results
@@ -94,9 +94,9 @@ plt.savefig('figures/' + name + '__reward.png')
 plt.close()
 
 ###########
-# Simulate agent
+# Analyze run
 
-rewards2, done2, log_prob2, value2, entropy2, internal2 = agent.simulate(ground_truth, observations, actions)
+rewards2, log_prob, entropy, value, returns, hidden = agent.analyze(ground_truth, observations, actions)
 
 ##########
 # visualize results
@@ -108,20 +108,26 @@ plt.ylabel('cumulative reward')
 plt.savefig('figures/' + name + '__reward2.png')
 plt.close()
 
-plt.plot(range(len(log_prob2)), log_prob2, 'k')
+plt.plot(range(len(log_prob)), log_prob, 'k')
 plt.xlabel('iteration')
 plt.ylabel('log probability')
-plt.savefig('figures/' + name + '__log_prob2.png')
+plt.savefig('figures/' + name + '__log_prob.png')
 plt.close()
 
-plt.plot(range(len(log_prob2)), log_prob2, 'k')
+plt.plot(range(len(entropy)), entropy, 'k')
 plt.xlabel('iteration')
-plt.ylabel('log probability')
-plt.savefig('figures/' + name + '__entropy2.png')
+plt.ylabel('entropy')
+plt.savefig('figures/' + name + '__entropy.png')
 plt.close()
 
-plt.plot(range(len(value2)), value2, 'k')
+plt.plot(range(len(value)), value, 'k')
 plt.xlabel('iteration')
 plt.ylabel('value')
-plt.savefig('figures/' + name + '__value2.png')
+plt.savefig('figures/' + name + '__value.png')
+plt.close()
+
+plt.plot(range(len(returns)), returns, 'k')
+plt.xlabel('iteration')
+plt.ylabel('returns')
+plt.savefig('figures/' + name + '__returns.png')
 plt.close()

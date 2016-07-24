@@ -65,9 +65,7 @@ plt.close()
 # from chainer import serializers
 # arl.agent.model = serializers.load_npz('models/TestARL_MLP.model')
 
-# ground_truth, observations, actions, rewards, qvalues, terminal, internal = agent.run(test_iter)
-
-rewards, ground_truth, observations, actions, done, log_prob, entropy, value, internal = agent.run(test_iter)
+rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
 ##########
 # visualize results

@@ -58,7 +58,7 @@ plt.close()
 ###########
 # Run agent
 
-rewards = arl.run(test_iter)
+rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
 ##########
 # visualize results
