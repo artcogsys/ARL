@@ -427,6 +427,9 @@ class A2C(Agent):
             # compute entropy
             entropy[i] = self.entropy(pi).data
 
+            # add hidden states
+
+
             # For the last step we don't have an observation or ground truth (end of experiment)
             if i < test_iter - 1:
                 env.set_ground_truth(ground_truth[i + 1])
