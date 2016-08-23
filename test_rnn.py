@@ -14,7 +14,7 @@ from arl import *
 # Parameter specification
 
 # learn model
-learn = False
+learn = True
 
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
