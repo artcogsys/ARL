@@ -1,9 +1,11 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import environments
 import modelzoo as mz
 import agents
-import matplotlib.pyplot as plt
 from arl import *
 
 ###########

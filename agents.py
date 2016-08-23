@@ -257,9 +257,15 @@ class A2C(Agent):
 
         # generate action according to policy
         p = F.softmax(pi).data[0]
+        
+	# normalize p in case tiny floating precision problems occur
+        assert( np.sum(p) > 0.999999 )
+        p = p.astype('float64')
+	p /= p.sum()
 
         # return action chosen according to stochastic policy
-        return np.random.choice(self.noutput, None, True, p), pi, v
+
+	return np.random.choice(self.noutput, None, True, p), pi, v
 
     def entropy(self,pi):
         """
@@ -362,10 +368,11 @@ class A2C(Agent):
             entropy: Entropy of the stochastic policy according to the actor
             value: Output of the critic (estimated value according to current state of the model)
             returns: The expected return at each point in time
+            advantage: returns - value
+	    advantage_surprise: squared advantage as a possible measure for surprise
             hidden: internal states (hidden units)
 
 
-        Note 1: Advantage is easily computed as returns - value
         Note 2: Squared advantage could be a measure of surprise?
         """
 
@@ -446,4 +453,7 @@ class A2C(Agent):
             R = rewards[i] + self.gamma * R
             returns[i] = R
 
-        return rewards, log_prob, entropy, value, returns, hidden
+        advantage = returns - value
+        advantage_surprise = advantage**2
+
+        return rewards, log_prob, entropy, value, returns, advantage, advantage_surprise, hidden

@@ -1,9 +1,11 @@
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import environments
 import modelzoo as mz
 import agents
-import matplotlib.pyplot as plt
 from arl import *
 
 ## GIVE NETWORK ABILITY TO LEARN ON DATA ACQUIRED BY SUBJECT
@@ -95,7 +97,7 @@ plt.close()
 ###########
 # Analyze run
 
-rewards2, log_prob, entropy, value, returns, hidden = agent.analyze(ground_truth, observations, actions)
+rewards2, log_prob, entropy, value, returns, advantage, advantage_surprise, hidden = agent.analyze(ground_truth, observations, actions)
 
 ##########
 # visualize results
@@ -129,4 +131,16 @@ plt.plot(range(len(returns)), returns, 'k')
 plt.xlabel('iteration')
 plt.ylabel('returns')
 plt.savefig('figures/' + name + '__returns.png')
+plt.close()
+
+plt.plot(range(len(advantage)), advantage, 'k')
+plt.xlabel('iteration')
+plt.ylabel('advantage')
+plt.savefig('figures/' + name + '__advantage.png')
+plt.close()
+
+plt.plot(range(len(advantage_surprise)), advantage_surprise, 'k')
+plt.xlabel('iteration')
+plt.ylabel('surprise')
+plt.savefig('figures/' + name + '__surprise.png')
 plt.close()
