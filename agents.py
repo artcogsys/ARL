@@ -243,7 +243,7 @@ class A2C(Agent):
 
         return [ts, losses]
 
-    def act(self, obs):
+    def act(self, obs, internal_states = False):
         """
 
         Advantage actor-critic is always on-policy
@@ -253,19 +253,24 @@ class A2C(Agent):
         """
 
         # get output of actor model for this observation
-        pi, v = self.model(obs)
+        if internal_states:
+            pi, v, internal = self.model(obs, internal_states = True)
+        else:
+            pi, v = self.model(obs)
 
         # generate action according to policy
         p = F.softmax(pi).data[0]
-        
-	# normalize p in case tiny floating precision problems occur
+
+        # normalize p in case tiny floating precision problems occur
         assert( np.sum(p) > 0.999999 )
         p = p.astype('float64')
-	p /= p.sum()
+        p /= p.sum()
 
         # return action chosen according to stochastic policy
-
-	return np.random.choice(self.noutput, None, True, p), pi, v
+        if internal_states:
+            return np.random.choice(self.noutput, None, True, p), pi, v, internal
+        else:
+            return np.random.choice(self.noutput, None, True, p), pi, v
 
     def entropy(self,pi):
         """
@@ -369,11 +374,10 @@ class A2C(Agent):
             value: Output of the critic (estimated value according to current state of the model)
             returns: The expected return at each point in time
             advantage: returns - value
-	    advantage_surprise: squared advantage as a possible measure for surprise
-            hidden: internal states (hidden units)
+	        advantage_surprise: squared advantage as a possible measure for surprise
+            _internal_states: internal states (hidden units, cell states, etc.; model dependent)
 
-
-        Note 2: Squared advantage could be a measure of surprise?
+        Note: Squared advantage could be a measure of surprise?
         """
 
         test_iter = ground_truth.shape[0]
@@ -393,7 +397,7 @@ class A2C(Agent):
         returns = np.zeros([test_iter, 1], dtype=np.float32)
         returns[:] = np.nan
 
-        hidden = []
+        _internal_states = {}
 
         ###
         # Start run
@@ -414,7 +418,7 @@ class A2C(Agent):
         for i in xrange(test_iter):
 
             # generate action using actor model
-            action, pi, v = self.act(obs)
+            action, pi, v, internal = self.act(obs, internal_states = True)
 
             log_prob[i] = self.log_prob(action, pi).data
 
@@ -434,8 +438,14 @@ class A2C(Agent):
             # compute entropy
             entropy[i] = self.entropy(pi).data
 
-            # add hidden states
+            # initialize internal states
+            if i == 0:
+                for k in internal.keys():
+                    _internal_states[k] = np.zeros([test_iter, internal[k].size], dtype=np.float32)
 
+            # add internal states
+            for k in internal.keys():
+                _internal_states[k][i] = internal[k]
 
             # For the last step we don't have an observation or ground truth (end of experiment)
             if i < test_iter - 1:
@@ -456,4 +466,4 @@ class A2C(Agent):
         advantage = returns - value
         advantage_surprise = advantage**2
 
-        return rewards, log_prob, entropy, value, returns, advantage, advantage_surprise, hidden
+        return rewards, log_prob, entropy, value, returns, advantage, advantage_surprise, _internal_states

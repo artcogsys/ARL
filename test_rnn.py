@@ -14,7 +14,7 @@ from arl import *
 # Parameter specification
 
 # learn model
-learn = True
+learn = False
 
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
@@ -97,7 +97,7 @@ plt.close()
 ###########
 # Analyze run
 
-rewards2, log_prob, entropy, value, returns, advantage, advantage_surprise, hidden = agent.analyze(ground_truth, observations, actions)
+rewards2, log_prob, entropy, value, returns, advantage, advantage_surprise, internal = agent.analyze(ground_truth, observations, actions)
 
 ##########
 # visualize results

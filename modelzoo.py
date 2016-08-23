@@ -1,6 +1,7 @@
 from chainer import Chain, Variable
 import chainer.initializers as init
 import chainer.functions as F
+from chainer.functions.activation import lstm
 import chainer.links as L
 import numpy as np
 
@@ -32,11 +33,12 @@ class MLP(Chain):
 
         # Note that pi and v define the actor and critic, respectively
 
-    def __call__(self, x, persistent=False):
+    def __call__(self, x, persistent=False, internal_states=False):
         """
 
         :param x: sensory input
         :param persistent: whether or not to retain the internal state (if any)
+        :param internal_states: whether or not to return internal states
         :return: policy output pi and value v
         """
 
@@ -63,8 +65,10 @@ class MLP(Chain):
         pi = self.pi(h)
         v = self.v(h)
 
-        return pi, v
-
+        if internal_states:
+            return pi, v, {'hidden state': h.data[0]}
+        else:
+            return pi, v
 
     def unchain_backward(self):
         pass
@@ -75,6 +79,14 @@ class MLP(Chain):
         if self.nframes > 1:
             self.buffer = np.zeros([self.nframes, self.ninput], dtype=np.float32)
             self.idx = 0
+
+
+    def get_internal(self):
+        """
+        Returns: internal states
+        """
+
+
 
 class CNN(Chain):
     """
@@ -102,11 +114,12 @@ class CNN(Chain):
 
         self.reset()
 
-    def __call__(self, x, persistent = False):
+    def __call__(self, x, persistent = False, internal_states=False):
         """
 
         :param x: sensory input (1 x nframes x ninput[0] x ninput[1])
         :param persistent: whether or not to retain the internal state (if any)
+        :param internal_states: whether or not to return internal states
         :return: policy output pi and value v
         """
 
@@ -133,7 +146,10 @@ class CNN(Chain):
         pi = self.pi(h)
         v = self.v(h)
 
-        return pi, v
+        if internal_states:
+            return pi, v, {'hidden state': h.data[0]}
+        else:
+            return pi, v
 
     def unchain_backward(self):
         pass
@@ -165,27 +181,50 @@ class RNN(Chain):
 
         # Note that pi and v define the actor and critic, respectively
 
-    def __call__(self, x, persistent=False):
+    def __call__(self, x, persistent=False, internal_states=False):
         """
 
         :param x: sensory input
         :param persistent: whether or not to retain the internal state (if any)
+        :param internal_states: whether or not to return internal states
+                h = hidden states
+                c = cell states
+                a = cell input
+                i = input gates
+                f = forget gates
+                o = output gates
+
+        c &= \\tanh(a) \\text{sigmoid}(i)
+           + c_{\\text{prev}} \\text{sigmoid}(f), \\\\
+        h &= \\tanh(c) \\text{sigmoid}(o).
+
+        http://www.felixgers.de/papers/phd.pdf
+        http://docs.chainer.org/en/stable/_modules/chainer/functions/activation/lstm.html
+
         :return: policy output pi and value v
 
         """
 
         if persistent:
             _c, _h = self.get_persistent()
-            h = self.l1(Variable(x))
-            pi = self.pi(h)
-            v = self.v(h)
-            self.set_persistent(_c, _h)
-        else:
-            h = self.l1(Variable(x))
-            pi = self.pi(h)
-            v = self.v(h)
 
-        return pi, v
+        h = self.l1(Variable(x))
+        pi = self.pi(h)
+        v = self.v(h)
+
+        if internal_states:
+            c = self.l1.c
+            a, i, f, o = lstm._extract_gates(
+                self.l1.upward.b.data.reshape(1, 4 * c.data.size, 1))
+
+        if persistent:
+            self.set_persistent(_c, _h)
+
+        if internal_states:
+            return pi, v, {'hidden state': h.data[0], 'cell state': c.data[0], 'cell input': a.squeeze(),
+                           'input gates': i.squeeze(), 'forget gates': f.squeeze(), 'output gates': o.squeeze()}
+        else:
+            return pi, v
 
     def reset(self):
         self.l1.reset_state()
@@ -217,29 +256,37 @@ class CRNN(Chain):
             v=L.Linear(nhidden, 1, initialW=init.HeNormal()),
         )
 
-    def __call__(self, x, persistent=False):
+    def __call__(self, x, persistent=False, internal_states=False):
         """
 
         :param x: sensory input
         :param persistent: whether or not to retain the internal state (if any)
+        :param internal_states: whether or not to return internal states
         :return: policy output pi and value v
 
         """
 
         if persistent:
             _c, _h = self.get_persistent()
-            h = F.relu(self.l1(Variable(np.expand_dims(x, axis=0))))
-            h = self.l2(h)
-            pi = self.pi(h)
-            v = self.v(h)
-            self.set_persistent(_c, _h)
-        else:
-            h = F.relu(self.l1(Variable(np.expand_dims(x, axis=0))))
-            h = self.l2(h)
-            pi = self.pi(h)
-            v = self.v(h)
 
-        return pi, v
+        h1 = F.relu(self.l1(Variable(np.expand_dims(x, axis=0))))
+        h2 = self.l2(h1)
+        pi = self.pi(h2)
+        v = self.v(h2)
+
+        if internal_states:
+            c2 = self.l2.c
+            a2, i2, f2, o2 = lstm._extract_gates(
+                self.l2.upward.b.data.reshape(1, 4 * c2.data.size, 1))
+
+        if persistent:
+            self.set_persistent(_c, _h)
+
+        if internal_states:
+            return pi, v, {'l1.hidden state': h1.data[0], 'l2.hidden state': h2.data[0], 'l2.cell state': c2.data[0], 'l2.cell input': a2.squeeze(),
+                           'l2.input gates': i2.squeeze(), 'l2.forget gates': f2.squeeze(), 'l2.output gates': o2.squeeze()}
+        else:
+            return pi, v
 
     def reset(self):
         self.l2.reset_state()
