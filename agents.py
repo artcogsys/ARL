@@ -441,7 +441,8 @@ class A2C(Agent):
             # initialize internal states
             if i == 0:
                 for k in internal.keys():
-                    _internal_states[k] = np.zeros([test_iter, internal[k].size], dtype=np.float32)
+                    ksize = [test_iter] + list(internal[k].shape)
+                    _internal_states[k] = np.zeros(ksize, dtype=np.float32)
 
             # add internal states
             for k in internal.keys():
