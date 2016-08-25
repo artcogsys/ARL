@@ -118,7 +118,7 @@ class ProbabilisticCategorization(Environment):
 
     """
 
-    def __init__(self, odds = [0.25, 0.5, 2, 4]):
+    def __init__(self, odds = [0.25, 0.75, 1.5, 2.5]):
         """
 
         :param: odds : determines odds ratio
@@ -135,7 +135,7 @@ class ProbabilisticCategorization(Environment):
         self.ninput = len(self.p)
         self.noutput = 3
 
-        self.rewards = [-1, 10, -100]
+        self.rewards = [-1, 15, -100]
 
         # normalize rewards
         self.rewards = np.array(self.rewards) / float(np.max(np.abs(self.rewards)))

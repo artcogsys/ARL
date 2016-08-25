@@ -5,6 +5,13 @@ from chainer.functions.activation import lstm
 import chainer.links as L
 import numpy as np
 
+"""
+Note: We may want to make use of batch normalization to ensure that hyperparams are robust over problem settings:
+
+Lillicrap, T.P., Hunt, J.J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., Silver, D., Wierstra, D., 2015. Continuous control with deep reinforcement learning.
+
+"""
+
 class MLP(Chain):
     """
     Model implements actor and critic with shared model
