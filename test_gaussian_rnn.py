@@ -1,3 +1,20 @@
+# overflow problem encountered
+
+# clean up definition of environment; discrete, nr actions, values, dimensions of state variable, etc etc
+
+# pi should be a 1-d variable. that's why we have the data[0] issue all the time
+# this in turn is probably determined by the shape of the observations...
+# yes, but 1-d variables is not allowed by layer definitions... closed
+
+# it would actually be more convenient to create mu and sigma2 from the RNN. However,
+# (1) needs specialized code in multiple places and also needs redefinition of RNN
+
+# Let's try the latter anyway; might not be too problematic and makes use of continuous model more explicit
+# Use discrete flag on RNN? Or create separate RNN model; latter might be cleaner.. return pi = [mu, sigma]
+# then just implement the continuous specialisations on the logprob and entropy functions
+
+# we also need proper test code to ensure that we don't break anything!
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -22,31 +39,24 @@ nprocs = None
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 3*10**4# number training iterations
+train_iter = 3*10**3 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
 # Environment specification
 
-# n = 5
-# p = 0.8
-# env = environments.Foo(n,p)
-
-odds = [0.25, 0.5, 2, 4]
-#odds = [0.5, 0.9, 0.9, 1.1, 1.1, 2]
-#odds = [0.5, 2]
-env = environments.ProbabilisticCategorization(odds)
+env = environments.TrackingSine()
 
 ###########
 # Actor and critic specification
 
 nhidden = 20
-model = mz.RNN(env.ninput, nhidden, env.noutput)
+model = mz.GaussianRNN(env.ninput, nhidden, env.noutput, covariance = 'fixed')
 
 ##########
 # Specify agent
 
-agent = agents.A2C(env, model)
+agent = agents.A2C(env, model, discrete = False)
 
 ###########
 # Specify experiment
@@ -95,13 +105,37 @@ plt.ylabel('cumulative reward')
 plt.savefig('figures/' + name + '__reward.png')
 plt.close()
 
+# plot distances between ground truth and action
+
+distances = np.linalg.norm(ground_truth - actions, axis=1)
+plt.plot(range(len(distances)), distances, 'k')
+plt.xlabel('iteration')
+plt.ylabel('distance')
+plt.savefig('figures/' + name + '__distances.png')
+plt.close()
+
+# plot x position between ground truth and action
+
+#plt.subplot(121)
+plt.plot(range(len(ground_truth[:,0])), ground_truth[:,0], 'k')
+plt.plot(range(len(actions[:,0])), actions[:,0], 'r')
+plt.xlabel('iteration')
+plt.ylabel('x position')
+# plt.subplot(122)
+# plt.plot(range(len(ground_truth[:,1])), ground_truth[:,1], 'k')
+# plt.plot(range(len(actions[:,1])), actions[:,1], 'r')
+# plt.xlabel('iteration')
+# plt.ylabel('y position')
+plt.savefig('figures/' + name + '__xy_position.png')
+plt.close()
+
 ###########
 # Analyze run
 
-rewards2, log_prob, entropy, value, returns, advantage, advantage_surprise, internal = agent.analyze(ground_truth, observations, actions)
+rewards2, score_function, entropy, value, returns, advantage, advantage_surprise, internal = agent.analyze(ground_truth, observations, actions)
 
 ##########
-# visualize results
+# plot results
 
 # sanity check
 plt.plot(range(len(rewards2)), np.cumsum(rewards2), 'k')
@@ -110,9 +144,9 @@ plt.ylabel('cumulative reward')
 plt.savefig('figures/' + name + '__reward2.png')
 plt.close()
 
-plt.plot(range(len(log_prob)), log_prob, 'k')
+plt.plot(range(len(score_function)), score_function, 'k')
 plt.xlabel('iteration')
-plt.ylabel('log probability')
+plt.ylabel('score function')
 plt.savefig('figures/' + name + '__score_function.png')
 plt.close()
 
@@ -145,3 +179,8 @@ plt.xlabel('iteration')
 plt.ylabel('surprise')
 plt.savefig('figures/' + name + '__surprise.png')
 plt.close()
+
+##########
+# render results
+
+# agent.render(ground_truth, observations, actions)

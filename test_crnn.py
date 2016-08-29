@@ -14,6 +14,9 @@ from arl import *
 # learn model
 learn = True
 
+# number of processes
+nprocs = None
+
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -51,19 +54,17 @@ arl = ARL(agent)
 
 if learn:
 
-    losses, agent = arl.learn(train_iter)
+    loss, agent = arl.learn(train_iter, nprocs)
 
     ###########
     # Save model
 
     agent.save(name)
 
-    ###########
-    # plot log loss for one worker
-    ts = losses[losses.keys()[0]][0]
-    loss = losses[losses.keys()[0]][1]
+    if nprocs != 1: # get log loss for one worker
+        loss = loss[loss.keys()[0]]
 
-    plt.plot(ts, loss, 'k')
+    plt.plot(loss[0], loss[1], 'k')
     plt.xlabel('iteration')
     plt.ylabel('loss')
     plt.savefig('figures/' + name + '__loss.png')
@@ -100,7 +101,7 @@ plt.close()
 plt.plot(range(len(log_prob)), log_prob, 'k')
 plt.xlabel('iteration')
 plt.ylabel('log probability')
-plt.savefig('figures/' + name + '__log_prob.png')
+plt.savefig('figures/' + name + '__score_function.png')
 plt.close()
 
 plt.plot(range(len(entropy)), entropy, 'k')

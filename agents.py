@@ -1,8 +1,12 @@
+import math
 import numpy as np
 from chainer import optimizers, Variable
 import chainer.functions as F
 from asynchronous import RMSpropAsync
 from chainer import serializers
+from chainer import variable
+from chainer.functions.math import exponential
+from chainer.functions.math import sum
 
 def copy_param(target_link, source_link):
     """Copy parameters of a link to another link.
@@ -92,15 +96,21 @@ class A2C(Agent):
         # the global shared model
         self.shared_model = None
 
+        # define discrete or continuous action space
+        self.discrete = kwargs.get('discrete', True)
+
         # maximal number of accumulation steps
         self.t_max = 10
 
         # entropy parameter
-        self.beta = 1e-2
+        if self.discrete:
+            self.beta = 1e-2
+        else:
+            self.beta = 1e-4
 
         # stored variables needed for gradient updating
-        self.past_action_log_prob = {}
-        self.past_action_entropy = {}
+        self.past_score_function = {}
+        self.past_entropy = {}
         self.past_states = {}
         self.past_rewards = {}
         self.past_values = {}
@@ -149,7 +159,11 @@ class A2C(Agent):
                 # generate action using actor model
                 action, pi, v = self.act(obs)
 
-                self.past_action_log_prob[idx] = self.log_prob(action, pi)
+                # store log policy data
+                self.past_score_function[idx] = self.score_function(action, pi)
+
+                # compute entropy
+                self.past_entropy[idx] = self.entropy(pi)
 
                 # perform action via actor and receive new observations and reward
                 obs, reward, done = self.environment.step(action)
@@ -163,9 +177,6 @@ class A2C(Agent):
                 # store reward and value
                 self.past_rewards[idx] = reward
                 self.past_values[idx] = v
-
-                # compute entropy
-                self.past_action_entropy[idx] = self.entropy(pi)
 
                 t += 1
 
@@ -189,13 +200,13 @@ class A2C(Agent):
                 advantage = R - v
 
                 # get log probability
-                log_prob = self.past_action_log_prob[i]
+                score_function = self.past_score_function[i]
 
                 # Compute entropy
-                entropy = self.past_action_entropy[i]
+                entropy = self.past_entropy[i]
 
-                # Log probability is increased proportionally to advantage
-                pi_loss -= log_prob * float(advantage.data)
+                # Log policy (probability of action given observations) is increased proportionally to advantage
+                pi_loss -= score_function * float(advantage.data)
 
                 # loss is reduced by high entropy (stochastic) policies
                 pi_loss -= self.beta * entropy
@@ -227,8 +238,8 @@ class A2C(Agent):
             self.optimizer.update()
 
             # reset stored values
-            self.past_action_log_prob = {}
-            self.past_action_entropy = {}
+            self.past_score_function = {}
+            self.past_entropy = {}
             self.past_states = {}
             self.past_rewards = {}
             self.past_values = {}
@@ -254,23 +265,40 @@ class A2C(Agent):
 
         # get output of actor model for this observation
         if internal_states:
-            pi, v, internal = self.model(obs, internal_states = True)
+            pi, v, internal = self.model(obs, internal_states=True)
         else:
             pi, v = self.model(obs)
 
-        # generate action according to policy
-        p = F.softmax(pi).data[0]
+        # generate action for discrete or continuous action space
+        if self.discrete:
 
-        # normalize p in case tiny floating precision problems occur
-        assert( np.sum(p) > 0.999999 )
-        p = p.astype('float64')
-        p /= p.sum()
+            # generate action according to policy
+            p = F.softmax(pi).data[0]
+
+            # normalize p in case tiny floating precision problems occur
+            assert( np.sum(p) > 0.999999 )
+            p = p.astype('float64')
+            p /= p.sum()
+
+            action = np.random.choice(self.noutput, None, True, p)
+
+        else:
+
+            mu = pi[0].data[0]
+
+            # create diagonal covariance matrix
+            sigma2 = F.softplus(pi[1])
+            # sigma2 = F.exp(pi[1])
+            C = sigma2.data[0] * np.eye(mu.size)
+
+            # can probably be done in a numerically more stable manner
+            action = np.random.multivariate_normal(mu, C)
 
         # return action chosen according to stochastic policy
         if internal_states:
-            return np.random.choice(self.noutput, None, True, p), pi, v, internal
+            return action, pi, v, internal
         else:
-            return np.random.choice(self.noutput, None, True, p), pi, v
+            return action, pi, v
 
     def entropy(self,pi):
         """
@@ -281,24 +309,63 @@ class A2C(Agent):
         Returns: entropy of the stochastic policy
 
         """
-        p = F.softmax(pi)
-        logp = F.log_softmax(pi)
 
-        return - F.sum(p * logp, axis=1)
+        if self.discrete:
 
-    def log_prob(self, action, pi):
+            p = F.softmax(pi)
+            logp = F.log_softmax(pi)
+
+            return - F.sum(p * logp, axis=1)
+
+        else:
+
+            # # transform into variance parameter
+            sigma2 = F.softplus(pi[1])
+
+            return - F.sum(0.5 * F.log(2 * math.pi * sigma2) + 1, axis=1)
+
+            # return - F.sum(0.5 * np.log(2 * math.pi) * F.log(pi[1]) + 1, axis=1)
+
+    def score_function(self, action, pi):
         """
 
         Args:
             action: selected action
             pi: stochastic policy
 
-        Returns: log probability of selected action
+        Returns: the log of the policy (the gradient is computed automatically :o) )
 
         """
 
-        logp = F.log_softmax(pi)
-        return F.select_item(logp, Variable(np.asarray([action], dtype=np.int32)))
+        if self.discrete:
+
+            logp = F.log_softmax(pi)
+            return F.select_item(logp, Variable(np.asarray([action], dtype=np.int32)))
+
+        else:
+
+            # this requires a general formulation in terms of covariances
+            # Covariance might be essential for complex actions? i.e. we need to be able to induce dependencies between actions!!
+
+            mu = pi[0]
+
+            sigma2 = F.softplus(pi[1]) # needed for numerical stability
+            log_var = F.log(sigma2) # expected by gaussian_nll
+
+            # contents of F.gaussian_nll
+            x = Variable(np.asarray([action], dtype=np.float32))
+            D = x.data.size
+            x_prec = exponential.exp(-log_var)
+            x_diff = x - mu
+            x_power = (x_diff * x_diff) * x_prec * -0.5
+            v = - ((sum.sum(log_var) + D * math.log(2 * math.pi)) / 2 - sum.sum(x_power))
+
+            # sigma2 = F.softplus(pi[1]) # needed for numerical stability
+            # log_var = F.log(sigma2) # expected by gaussian_nll
+            # v = - F.gaussian_nll(Variable(np.asarray([action], dtype=np.float32)), mu, log_var)
+
+            return F.expand_dims(v,0)
+
 
     def simulate(self, test_iter):
         """
@@ -314,12 +381,21 @@ class A2C(Agent):
             done: whether or not we are in a terminal (done) state for each time point
         """
 
-        ground_truth = np.zeros([test_iter, 1], dtype=np.float32)
+        # set environment
+
+        env = self.environment
+
+        # assign variables
+
+        ground_truth = np.zeros([test_iter, env.nstates], dtype=np.float32)
 
         observations = np.zeros(np.hstack([test_iter, self.ninput]), dtype=np.float32)
         observations[:] = np.nan
 
-        actions = np.zeros([test_iter, 1], dtype=np.uint8)
+        if self.discrete:
+            actions = np.zeros([test_iter, env.naction], dtype=np.uint8)
+        else:
+            actions = np.zeros([test_iter, env.naction], dtype=np.float32)
         actions[:] = np.nan
 
         rewards = np.zeros([test_iter, 1], dtype=np.float32)
@@ -329,8 +405,6 @@ class A2C(Agent):
 
         ###
         # Start run
-
-        env = self.environment
 
         # initialize environment; this generates a ground truth
         obs = env.reset()
@@ -369,7 +443,7 @@ class A2C(Agent):
 
         Returns:
             rewards: Can be used for sanity checking (does analysis yield same reward trajectory as experiment?)
-            log_prob: Output of the actor (log probability of selected action)
+            score_function: Output of the actor (log probability of selected action)
             entropy: Entropy of the stochastic policy according to the actor
             value: Output of the critic (estimated value according to current state of the model)
             returns: The expected return at each point in time
@@ -385,8 +459,8 @@ class A2C(Agent):
         rewards = np.zeros([test_iter, 1], dtype=np.float32)
         rewards[:] = np.nan
 
-        log_prob = np.zeros([test_iter, 1], dtype=np.float32)
-        log_prob[:] = np.nan
+        score_function = np.zeros([test_iter, 1], dtype=np.float32)
+        score_function[:] = np.nan
 
         entropy = np.zeros([test_iter, 1], dtype=np.float32)
         entropy[:] = np.nan
@@ -420,7 +494,7 @@ class A2C(Agent):
             # generate action using actor model
             action, pi, v, internal = self.act(obs, internal_states = True)
 
-            log_prob[i] = self.log_prob(action, pi).data
+            score_function[i] = self.score_function(action, pi).data
 
             # perform action via actor and receive new observations and reward
             obs, reward, done = self.environment.step(actions[i])
@@ -467,4 +541,46 @@ class A2C(Agent):
         advantage = returns - value
         advantage_surprise = advantage**2
 
-        return rewards, log_prob, entropy, value, returns, advantage, advantage_surprise, _internal_states
+        return rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states
+
+    def render(self, ground_truth, observations, actions):
+
+        test_iter = ground_truth.shape[0]
+
+        ###
+        # Start run
+
+        env = self.environment
+
+        # initialize environment
+        obs = env.reset()
+        obs_shape = obs.shape
+        obs = observations[0].reshape(obs_shape)
+
+        # force ground truth to be the same as that of the behavioural data
+        env.set_ground_truth(ground_truth[0])
+
+        # reset agent
+        self.model.reset()
+
+        for i in xrange(test_iter):
+
+            # generate action using actor model
+            action, pi, v, internal = self.act(obs)
+
+            # render state, observation and action
+            self.environment.render(action)
+
+            # perform action via actor and receive new observations and reward
+            obs, reward, done = self.environment.step(actions[i])
+
+            # if done:
+            #     self.model.reset()
+
+            # No reward clipping; will lead to random guessing as best option for our environment
+            # reward = np.clip(reward, -1, 1)
+
+            # For the last step we don't have an observation or ground truth (end of experiment)
+            if i < test_iter - 1:
+                env.set_ground_truth(ground_truth[i + 1])
+                obs = observations[i + 1].reshape(obs_shape)

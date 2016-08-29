@@ -44,7 +44,7 @@ class ARL(object):
 
             loss = self.agent.learn(niter)
 
-            return loss
+            return loss, self.agent
 
         else:
 

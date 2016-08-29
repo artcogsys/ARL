@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
@@ -11,6 +12,12 @@ from scipy.io import savemat
 class Environment(object):
 
     def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
         pass
 
     def step(self, action):
@@ -50,11 +57,19 @@ class Foo(Environment):
 
         self.ninput = n
         self.p = p
-        self.noutput = 2
+
+        self.naction = 1 # number of action variables
+        self.noutput = 2 # number of output variables for the agent (discrete case)
+        self.nstates = 1 # number of state variables
 
         self.reset()
 
     def reset(self):
+        """
+
+        Returns: observation
+
+        """
 
         self.state = np.random.randint(0, 2)
 
@@ -133,7 +148,10 @@ class ProbabilisticCategorization(Environment):
         self.q = (1.0/self.odds)/float(np.sum(1.0/self.odds))
 
         self.ninput = len(self.p)
-        self.noutput = 3
+
+        self.naction = 1 # number of action variables
+        self.noutput = 3 # number of output variables for the agent (discrete case)
+        self.nstates = 1 # number of state variables
 
         self.rewards = [-1, 15, -100]
 
@@ -159,6 +177,11 @@ class ProbabilisticCategorization(Environment):
 
 
     def reset(self):
+        """
+
+        Returns: observation
+
+        """
 
         self.state = np.random.randint(1, 3)  # 1 = left, 2 = right
 
@@ -300,7 +323,10 @@ class RandomDotMotion(Environment):
             sys.exit("Please use a valid number of dots.")
 
         self.ninput = [self.pixwidth, self.pixwidth]
-        self.noutput = 3
+
+        self.naction = 1 # number of action variables
+        self.noutput = 3 # number of output variables for the agent (discrete case)
+        self.nstates = 1 # number of state variables
 
         self.obs_screen = np.zeros(self.ninput, dtype='float32')
         self.dots_pos_xy = np.zeros([2, self.n_dots])
@@ -369,6 +395,11 @@ class RandomDotMotion(Environment):
 
 
     def reset(self):
+        """
+
+        Returns: observation
+
+        """
 
         self.p_coherent = np.random.choice(self.coherence)
         self.n_coh_dots = self.p_coherent * self.n_dots
@@ -459,4 +490,300 @@ class RandomDotMotion(Environment):
 
             return self.reset(), reward, done
 
+#######
+### Continuous output models
+
+class RandomSample(Environment):
+    """
+    Simple continuous control task that is used to test continuous policy learning algorithms
+
+    It requires the network to reproduce the input, which are random numbers between 0 and 1
+
+    """
+
+    def __init__(self):
+        super(Environment, self).__init__()
+
+        self.ninput = 1
+        self.naction = 1 # number of action variables; predicted (x,y) position of target
+        self.noutput = 1 # number of output variables for the agent (continuous case)
+        self.nstates = 1 # number of state variables
+
+        self.reset()
+
+        # Figure handle
+        self.fig = None
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        self.state = np.array(np.random.random()-0.5)
+
+        # return observation
+        return self.state.reshape([1,1]).astype(np.float32)
+
+    def step(self, action):
+
+        # reward should minimize distance to target
+        reward = - np.linalg.norm(action - self.state)
+
+        self.state = np.array(np.random.random()-0.5)
+
+        obs = self.state.reshape([1,1]).astype(np.float32)
+
+        # we are never done...
+        done = False
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth
+
+
+class TrackingSine(Environment):
+    """
+    Simple continuous control task that is used to test continuous policy learning algorithms
+
+    It assumes a 1D sine wave which updates its state via a Gaussian drift term.
+    The goal of the RL algorithm is to track the particle (i.e. to reproduce the input on the outputs)
+
+    """
+
+    def __init__(self):
+        super(Environment, self).__init__()
+
+        self.ninput = 1
+        self.naction = 1 # number of action variables; predicted (x,y) position of target
+        self.noutput = 1 # number of output variables for the agent (continuous case)
+        self.nstates = 1 # number of state variables
+
+        self.counter = 0
+
+        self.reset()
+
+        # Figure handle
+        self.fig = None
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        # each process starts at a different point in the sine wave
+        # self.counter = 100.0 * np.random.random() * 2.0 * math.pi;
+
+        self.state = np.array(10*np.sin(self.counter/100.0), dtype='float32')
+
+        return self.state.reshape([1,1])
+
+    def step(self, action):
+
+        # reward should minimize distance to target
+        reward = - np.linalg.norm(action - self.state)
+
+        # evolve state
+        self.counter += 1
+        self.state = np.array(10*np.sin(self.counter/100.0), dtype='float32')
+
+        obs = self.state.astype(np.float32).reshape([1,1])
+
+        # we are never done...
+        done = False
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth
+
+    def render(self,action):
+        # Rendering only works with pylab==tk:
+        # e.g. ipython wait_motion_coherence.py --pylab=tk
+
+        # rendering should be possible online and offline
+
+        if not self.fig:
+            self.fig = plt.figure()
+
+        plt.clf()
+        plt.imshow(self.obs_screen, cmap='Greys_r', interpolation='nearest')
+        self.fig.canvas.draw()
+
+class Tracking1D(Environment):
+    """
+    Simple continuous control task that is used to test continuous policy learning algorithms
+
+    It assumes a 1D particle which updates its state via a Gaussian drift term.
+    The goal of the RL algorithm is to track the particle (i.e. to reproduce the input on the outputs)
+
+    """
+
+    def __init__(self):
+        super(Environment, self).__init__()
+
+        self.ninput = 1
+        self.naction = 1 # number of action variables; predicted (x,y) position of target
+        self.noutput = 1 # number of output variables for the agent (continuous case)
+        self.nstates = 1 # number of state variables
+
+        self.reset()
+
+        # Figure handle
+        self.fig = None
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        self.state = np.array([0], dtype='float32')
+
+        return self.state.reshape([1,1])
+
+    def step(self, action):
+
+        # reward should minimize distance to target
+        reward = - np.linalg.norm(action - self.state)
+
+        # evolve state
+        self.state = np.random.multivariate_normal(self.state,np.array([1]).reshape([1,1]))
+
+        obs = self.state.astype(np.float32).reshape([1,1])
+
+        # we are never done...
+        done = False
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth
+
+    def render(self,action):
+        # Rendering only works with pylab==tk:
+        # e.g. ipython wait_motion_coherence.py --pylab=tk
+
+        # rendering should be possible online and offline
+
+        if not self.fig:
+            self.fig = plt.figure()
+
+        plt.clf()
+        plt.imshow(self.obs_screen, cmap='Greys_r', interpolation='nearest')
+        self.fig.canvas.draw()
+
+
+class Tracking2D(Environment):
+    """
+    Simple continuous control task that is used to test continuous policy learning algorithms
+
+    It assumes a 2D particle which updates its state via a Gaussian drift term.
+    The goal of the RL algorithm is to track the particle (i.e. to reproduce the input on the outputs)
+
+    """
+
+    def __init__(self):
+        super(Environment, self).__init__()
+
+        self.ninput = 2
+        self.naction = 2 # number of action variables; predicted (x,y) position of target
+        self.noutput = 2 # number of output variables for the agent (continuous case)
+        self.nstates = 2 # number of state variables
+
+        self.reset()
+
+        # Figure handle
+        self.fig = None
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        self.state = np.array([0, 0], dtype='float32')
+
+        return self.state.reshape([1, 2])
+
+    def step(self, action):
+
+        # reward is distance to target
+        reward = - np.linalg.norm(action - self.state)
+
+        # evolve state
+        self.state = np.random.multivariate_normal(self.state,[[1,0],[0,1]])
+
+        obs = self.state.astype(np.float32).reshape([1, 2])
+
+        # we are never done...
+        done = False
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth
+
+    def render(self,action):
+        # Rendering only works with pylab==tk:
+        # e.g. ipython wait_motion_coherence.py --pylab=tk
+
+        # rendering should be possible online and offline
+
+        if not self.fig:
+            self.fig = plt.figure()
+
+        plt.clf()
+        plt.imshow(self.obs_screen, cmap='Greys_r', interpolation='nearest')
+        self.fig.canvas.draw()
 

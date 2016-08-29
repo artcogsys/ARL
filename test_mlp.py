@@ -11,6 +11,12 @@ from arl import *
 ###########
 # Parameter specification
 
+# learn model
+learn = True
+
+# number of processes
+nprocs = None
+
 # get file name
 name = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -47,7 +53,28 @@ arl = ARL(agent)
 ###########
 # Learn model
 
-losses, agent = arl.learn(train_iter)
+if learn:
+
+    loss, agent = arl.learn(train_iter, nprocs)
+
+    ###########
+    # Save model
+
+    agent.save(name)
+
+    if nprocs != 1: # get log loss for one worker
+        loss = loss[loss.keys()[0]]
+
+    plt.plot(loss[0], loss[1], 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.savefig('figures/' + name + '__loss.png')
+    plt.close()
+
+else:
+
+    # We can also just load an existing model
+    agent.load(name)
 
 ###########
 # plot log loss for one worker
