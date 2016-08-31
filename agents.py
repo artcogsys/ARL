@@ -562,9 +562,9 @@ class A2C(Agent):
 
         # callback of analysis function
         if callback is not None:
-            callback(self.file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
         else:
-            self.callback_analyze(self.file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
 
     def render(self, ground_truth, observations, actions):
         """
@@ -638,7 +638,7 @@ class A2C(Agent):
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
 
-    def callback_analyze(self,file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
+    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
 
         ##########
         # visualize results

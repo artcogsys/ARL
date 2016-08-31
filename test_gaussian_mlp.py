@@ -30,6 +30,11 @@
 
 # use callback function to store intermediate models?
 
+# gedrag lijkt te zijn: sigma2 gaat naar nul toe; mean blijft dan vast zitten op de plek waar hij zat
+# ook al is dit suboptimaal
+
+# to do: score_function code opschonen / afleiden + numerieke problemen vermijden + exploratie forceren
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -37,6 +42,7 @@ import environments
 import modelzoo as mz
 import agents
 from arl import *
+import scipy.stats as sst
 
 # set interactive mode
 plt.ion()
@@ -53,7 +59,7 @@ nprocs = None
 # get file name
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 3*10**3 # number training iterations
+train_iter = 1*10**3 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
@@ -65,7 +71,7 @@ env = environments.RandomSample()
 # Actor and critic specification
 
 nhidden = 20
-model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'fixed')
+model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'spherical')
 
 ##########
 # Specify agent
@@ -88,9 +94,11 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
 
             custom_callback_learning.time = []
             custom_callback_learning.sigma2 = []
+            custom_callback_learning.mu = []
 
         custom_callback_learning.time.append(t)
-        custom_callback_learning.sigma2.append(pi[1].data[0])
+        custom_callback_learning.mu.append(pi[0].data[0])
+        custom_callback_learning.sigma2.append(F.softplus(pi[1]).data[0])
 
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
@@ -102,18 +110,20 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
         #
 
         plt.clf()
+        plt.subplot(211)
+        plt.plot(custom_callback_learning.time,custom_callback_learning.mu)
+        plt.xlabel('time')
+        plt.ylabel('mu')
+        plt.subplot(212)
         plt.plot(custom_callback_learning.time,custom_callback_learning.sigma2)
         plt.xlabel('time')
         plt.ylabel('sigma^2')
         plt.draw()
 #        plt.pause(0.01)
 
-def custom_callback_analyze(file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise,
-                     _internal_states):
+def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
 
-    agent.callback_analyze(file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise,
-                     _internal_states)
-
+    agent.callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
 
     # plot distances between ground truth and action
 
@@ -143,13 +153,8 @@ def custom_callback_analyze(file_name, rewards, score_function, entropy, value, 
     plt.scatter(ground_truth[:, 0], actions[:, 0])
     plt.xlabel('state')
     plt.ylabel('prediction')
+    plt.title('R:{}'.format(sst.pearsonr(ground_truth[:, 0],actions[:, 0])[0]))
     plt.savefig('figures/' + file_name + '__scatter.png')
-
-    plt.clf()
-    plt.plot(range(len(score_function)), score_function, 'k')
-    plt.xlabel('iteration')
-    plt.ylabel('score_function')
-    plt.savefig('figures/' + file_name + '__score_function.png')
 
 
 ###########
@@ -157,7 +162,7 @@ def custom_callback_analyze(file_name, rewards, score_function, entropy, value, 
 
 if learn:
 
-    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = None)
+    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = custom_callback_learning)
 
     ###########
     # Save model
@@ -172,7 +177,6 @@ if learn:
     plt.xlabel('iteration')
     plt.ylabel('loss')
     plt.savefig('figures/' + file_name + '__loss.png')
-
 
 else:
 
