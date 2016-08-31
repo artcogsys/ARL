@@ -26,8 +26,10 @@
 # af laten nemen van fixed variance over time zou ook nog kunnen werken; check ook bestaande implementaties/papers/etc
 # zie eventueel werk van pieter abbeel e.d.
 
-import matplotlib
-matplotlib.use('Agg')
+# should we store optimal model? maybe not needed for continuously changing data
+
+# use callback function to store intermediate models?
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -35,6 +37,9 @@ import environments
 import modelzoo as mz
 import agents
 from arl import *
+
+# set interactive mode
+plt.ion()
 
 ###########
 # Parameter specification
@@ -46,7 +51,7 @@ learn = True
 nprocs = None
 
 # get file name
-name = os.path.splitext(os.path.basename(__file__))[0]
+file_name = os.path.splitext(os.path.basename(__file__))[0]
 
 train_iter = 3*10**3 # number training iterations
 test_iter = 10**3 # number test iterations
@@ -65,7 +70,7 @@ model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'fixed')
 ##########
 # Specify agent
 
-agent = agents.A2C(env, model, discrete = False)
+agent = agents.A2C(env, model, discrete = False, file_name = file_name)
 
 ###########
 # Specify experiment
@@ -73,127 +78,116 @@ agent = agents.A2C(env, model, discrete = False)
 arl = ARL(agent)
 
 ###########
+# Custom callback functions
+
+def custom_callback_learning(name, t, losses, action, pi, v, reward):
+
+    if name == 'Process-1':
+
+        if "time" not in custom_callback_learning.__dict__:
+
+            custom_callback_learning.time = []
+            custom_callback_learning.sigma2 = []
+
+        custom_callback_learning.time.append(t)
+        custom_callback_learning.sigma2.append(pi[1].data[0])
+
+        # rough indication of how the loss changes
+        print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
+
+        # print 'epoch: {}'.format(model.optimizer.epoch)
+        # print 'legend: {}, {}'.format(termcolor.colored('training', 'red'), termcolor.colored('validation', 'green'))
+        # print 'loss: {}, {}'.format(termcolor.colored(model.log[('training', 'loss')][-1], 'red'), termcolor.colored(model.log[('validation', 'loss')][-1], 'green'))
+        # print 'throughput: {}, {}'.format(termcolor.colored(model.log[('training', 'throughput')][-1], 'red'), termcolor.colored(model.log[('validation', 'throughput')][-1], 'green'))
+        #
+
+        plt.clf()
+        plt.plot(custom_callback_learning.time,custom_callback_learning.sigma2)
+        plt.xlabel('time')
+        plt.ylabel('sigma^2')
+        plt.draw()
+#        plt.pause(0.01)
+
+def custom_callback_analyze(file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise,
+                     _internal_states):
+
+    agent.callback_analyze(file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise,
+                     _internal_states)
+
+
+    # plot distances between ground truth and action
+
+    plt.clf()
+    distances = np.linalg.norm(ground_truth - actions, axis=1)
+    plt.plot(range(len(distances)), distances, 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('distance')
+    plt.savefig('figures/' + file_name + '__distances.png')
+
+    # plot x position between ground truth and action
+
+    # plt.subplot(121)
+    plt.clf()
+    plt.plot(range(len(ground_truth[:, 0])), ground_truth[:, 0], 'k')
+    plt.plot(range(len(actions[:, 0])), actions[:, 0], 'r')
+    plt.xlabel('iteration')
+    plt.ylabel('x position')
+    # plt.subplot(122)
+    # plt.plot(range(len(ground_truth[:,1])), ground_truth[:,1], 'k')
+    # plt.plot(range(len(actions[:,1])), actions[:,1], 'r')
+    # plt.xlabel('iteration')
+    # plt.ylabel('y position')
+    plt.savefig('figures/' + file_name + '__xy_position.png')
+
+    plt.clf()
+    plt.scatter(ground_truth[:, 0], actions[:, 0])
+    plt.xlabel('state')
+    plt.ylabel('prediction')
+    plt.savefig('figures/' + file_name + '__scatter.png')
+
+    plt.clf()
+    plt.plot(range(len(score_function)), score_function, 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('score_function')
+    plt.savefig('figures/' + file_name + '__score_function.png')
+
+
+###########
 # Learn model
 
 if learn:
 
-    loss, agent = arl.learn(train_iter, nprocs)
+    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = None)
 
     ###########
     # Save model
 
-    agent.save(name)
+    agent.save(file_name)
 
-    if nprocs != 1: # get log loss for one worker
+    if nprocs != 1:  # get log loss for one worker
         loss = loss[loss.keys()[0]]
 
+    plt.clf()
     plt.plot(loss[0], loss[1], 'k')
     plt.xlabel('iteration')
     plt.ylabel('loss')
-    plt.savefig('figures/' + name + '__loss.png')
-    plt.close()
+    plt.savefig('figures/' + file_name + '__loss.png')
+
 
 else:
 
     # We can also just load an existing model
-    agent.load(name)
+    agent.load(file_name)
 
 ###########
 # Run agent
 
 rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
-##########
-# visualize results
-
-# plot rewards
-
-plt.plot(range(len(rewards)), np.cumsum(rewards), 'k')
-plt.xlabel('iteration')
-plt.ylabel('cumulative reward')
-plt.savefig('figures/' + name + '__reward.png')
-plt.close()
-
-# plot distances between ground truth and action
-
-distances = np.linalg.norm(ground_truth - actions, axis=1)
-plt.plot(range(len(distances)), distances, 'k')
-plt.xlabel('iteration')
-plt.ylabel('distance')
-plt.savefig('figures/' + name + '__distances.png')
-plt.close()
-
-# plot x position between ground truth and action
-
-#plt.subplot(121)
-plt.plot(range(len(ground_truth[:,0])), ground_truth[:,0], 'k')
-plt.plot(range(len(actions[:,0])), actions[:,0], 'r')
-plt.xlabel('iteration')
-plt.ylabel('x position')
-# plt.subplot(122)
-# plt.plot(range(len(ground_truth[:,1])), ground_truth[:,1], 'k')
-# plt.plot(range(len(actions[:,1])), actions[:,1], 'r')
-# plt.xlabel('iteration')
-# plt.ylabel('y position')
-plt.savefig('figures/' + name + '__xy_position.png')
-plt.close()
-
-plt.scatter(ground_truth[:,0], actions[:,0])
-plt.xlabel('state')
-plt.ylabel('prediction')
-plt.savefig('figures/' + name + '__scatter.png')
-plt.close()
-
 ###########
 # Analyze run
 
-rewards2, score_function, entropy, value, returns, advantage, advantage_surprise, internal = agent.analyze(ground_truth, observations, actions)
-
-##########
-# plot results
-
-# sanity check
-plt.plot(range(len(rewards2)), np.cumsum(rewards2), 'k')
-plt.xlabel('iteration')
-plt.ylabel('cumulative reward')
-plt.savefig('figures/' + name + '__reward2.png')
-plt.close()
-
-plt.plot(range(len(score_function)), score_function, 'k')
-plt.xlabel('iteration')
-plt.ylabel('score_function')
-plt.savefig('figures/' + name + '__score_function.png')
-plt.close()
-
-plt.plot(range(len(entropy)), entropy, 'k')
-plt.xlabel('iteration')
-plt.ylabel('entropy')
-plt.savefig('figures/' + name + '__entropy.png')
-plt.close()
-
-plt.plot(range(len(value)), value, 'k')
-plt.xlabel('iteration')
-plt.ylabel('value')
-plt.savefig('figures/' + name + '__value.png')
-plt.close()
-
-plt.plot(range(len(returns)), returns, 'k')
-plt.xlabel('iteration')
-plt.ylabel('returns')
-plt.savefig('figures/' + name + '__returns.png')
-plt.close()
-
-plt.plot(range(len(advantage)), advantage, 'k')
-plt.xlabel('iteration')
-plt.ylabel('advantage')
-plt.savefig('figures/' + name + '__advantage.png')
-plt.close()
-
-plt.plot(range(len(advantage_surprise)), advantage_surprise, 'k')
-plt.xlabel('iteration')
-plt.ylabel('surprise')
-plt.savefig('figures/' + name + '__surprise.png')
-plt.close()
+agent.analyze(rewards, ground_truth, observations, actions, callback = custom_callback_analyze)
 
 ##########
 # render results

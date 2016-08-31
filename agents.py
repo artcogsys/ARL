@@ -7,6 +7,10 @@ from chainer import serializers
 from chainer import variable
 from chainer.functions.math import exponential
 from chainer.functions.math import sum
+import matplotlib.pyplot as plt
+
+# set interactive mode
+plt.ion()
 
 def copy_param(target_link, source_link):
     """Copy parameters of a link to another link.
@@ -47,6 +51,9 @@ class Agent(object):
 
         # define optimizer
         self.optimizer = kwargs.get('optimizer', RMSpropAsync())
+
+        # define file name
+        self.file_name = kwargs.get('file_name', 'temp')
 
         # agent name
         self.name = kwargs.get('name', 'Agent')
@@ -115,13 +122,14 @@ class A2C(Agent):
         self.past_rewards = {}
         self.past_values = {}
 
-    def learn(self, niter):
+    def learn(self, niter, callback = None):
         """
 
         This implementation follow advantage actor-critic Algorithm 3 in Mnih as closely as possible
 
         Args:
             niter: number of training iterations (T_max in A3C paper)
+            callback: callback function to test convergence properties (None, self.callback or custom function)
 
         Returns: loss and times at which loss was acquired
 
@@ -244,13 +252,18 @@ class A2C(Agent):
             self.past_rewards = {}
             self.past_values = {}
 
+            # after next line???
             if t >= niter:
                 break
 
-            # rough indication of how the loss changes
-            print '{0}; {1}; {2:03.5f}'.format(t, self.name, loss.data[0])
             losses.append(loss.data[0])
             ts.append(t)
+
+            # callback during training
+            if callback is not None:
+                callback(self.name, t, losses, action, pi, v, reward)
+            else:
+                self.callback_learn(self.name, t, losses, action, pi, v, reward)
 
         return [ts, losses]
 
@@ -293,6 +306,8 @@ class A2C(Agent):
 
             # can probably be done in a numerically more stable manner
             action = np.random.multivariate_normal(mu, C)
+
+            # action = mu
 
         # return action chosen according to stochastic policy
         if internal_states:
@@ -349,19 +364,19 @@ class A2C(Agent):
 
             mu = pi[0]
 
-            sigma2 = F.softplus(pi[1]) # needed for numerical stability
-            log_var = F.log(sigma2) # expected by gaussian_nll
+            sigma2 = F.softplus(pi[1])  # needed for numerical stability
 
             # contents of F.gaussian_nll
             x = Variable(np.asarray([action], dtype=np.float32))
             D = x.data.size
+            log_var = F.log(sigma2)  # expected by gaussian_nll
             x_prec = exponential.exp(-log_var)
             x_diff = x - mu
             x_power = (x_diff * x_diff) * x_prec * -0.5
             v = - ((sum.sum(log_var) + D * math.log(2 * math.pi)) / 2 - sum.sum(x_power))
 
-            # sigma2 = F.softplus(pi[1]) # needed for numerical stability
-            # log_var = F.log(sigma2) # expected by gaussian_nll
+            # sigma2 = F.softplus(pi[1])  # needed for numerical stability
+            # log_var = F.log(sigma2)  # expected by gaussian_nll
             # v = - F.gaussian_nll(Variable(np.asarray([action], dtype=np.float32)), mu, log_var)
 
             return F.expand_dims(v,0)
@@ -433,13 +448,14 @@ class A2C(Agent):
         return rewards, ground_truth, observations, actions, done
 
 
-    def analyze(self, ground_truth, observations, actions):
+    def analyze(self, sim_rewards, ground_truth, observations, actions, callback):
         """
 
         Args:
-                ground_truth: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
-                observations: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
-                actions: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+            sim_rewards: rewards that are computed during simulation; only used for sanity checking
+            ground_truth: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+            observations: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
+            actions: of form np.array([test_iter, n_ground_truth], dtype = np.float32)
 
         Returns:
             rewards: Can be used for sanity checking (does analysis yield same reward trajectory as experiment?)
@@ -541,10 +557,27 @@ class A2C(Agent):
         advantage = returns - value
         advantage_surprise = advantage**2
 
-        return rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states
+        # sanity check so we are sure that analyze is ran on the exact same sequence as simulate
+        assert ((rewards == sim_rewards).all())
+
+        # callback of analysis function
+        if callback is not None:
+            callback(self.file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+        else:
+            self.callback_analyze(self.file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
 
     def render(self, ground_truth, observations, actions):
+        """
+        Renders the perception action loop for visual inspection (UNFINISHED)
 
+        Args:
+            ground_truth:
+            observations:
+            actions:
+
+        Returns:
+
+        """
         test_iter = ground_truth.shape[0]
 
         ###
@@ -584,3 +617,73 @@ class A2C(Agent):
             if i < test_iter - 1:
                 env.set_ground_truth(ground_truth[i + 1])
                 obs = observations[i + 1].reshape(obs_shape)
+
+
+    def callback_learn(self, name, t, losses, action, pi, v, reward):
+        """
+        Default callback function to check properties during learning
+
+        Args:
+            name: name of the agent
+            t: time step
+            losses: loss trajectory
+            pi: current policy output
+            v: current value output
+            reward: current reward
+
+        Returns:
+
+        """
+
+        # rough indication of how the loss changes
+        print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
+
+    def callback_analyze(self,file_name, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
+
+        ##########
+        # visualize results
+
+        # plot rewards
+
+        plt.clf()
+        plt.plot(range(len(rewards)), np.cumsum(rewards), 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('cumulative reward')
+        plt.savefig('figures/' + file_name + '__reward.png')
+
+        plt.clf()
+        plt.plot(range(len(score_function)), score_function, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('score_function')
+        plt.savefig('figures/' + file_name + '__score_function.png')
+
+        plt.clf()
+        plt.plot(range(len(entropy)), entropy, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('entropy')
+        plt.savefig('figures/' + file_name + '__entropy.png')
+
+        plt.clf()
+        plt.plot(range(len(value)), value, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('value')
+        plt.savefig('figures/' + file_name + '__value.png')
+
+        plt.clf()
+        plt.plot(range(len(returns)), returns, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('returns')
+        plt.savefig('figures/' + file_name + '__returns.png')
+
+        plt.clf()
+        plt.plot(range(len(advantage)), advantage, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('advantage')
+        plt.savefig('figures/' + file_name + '__advantage.png')
+
+        plt.clf()
+        plt.plot(range(len(advantage_surprise)), advantage_surprise, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('surprise')
+        plt.savefig('figures/' + file_name + '__surprise.png')
+        plt.close()

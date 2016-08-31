@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -7,6 +5,9 @@ import environments
 import modelzoo as mz
 import agents
 from arl import *
+
+# set interactive mode
+plt.ion()
 
 ###########
 # Parameter specification
@@ -18,7 +19,7 @@ learn = True
 nprocs = None
 
 # get file name
-name = os.path.splitext(os.path.basename(__file__))[0]
+file_name = os.path.splitext(os.path.basename(__file__))[0]
 
 train_iter = 10**4 # number training iterations
 test_iter = 10**3 # number test iterations
@@ -43,7 +44,7 @@ model = mz.MLP(env.ninput, nhidden, env.noutput, nframes=nframes)
 ###########
 # Specify agent
 
-agent = agents.A2C(env, model)
+agent = agents.A2C(env, model, file_name = file_name)
 
 ###########
 # Specify experiment
@@ -55,55 +56,39 @@ arl = ARL(agent)
 
 if learn:
 
-    loss, agent = arl.learn(train_iter, nprocs)
+    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = None)
 
     ###########
     # Save model
 
-    agent.save(name)
+    agent.save(file_name)
 
-    if nprocs != 1: # get log loss for one worker
+    if nprocs != 1:  # get log loss for one worker
         loss = loss[loss.keys()[0]]
 
+    plt.clf()
     plt.plot(loss[0], loss[1], 'k')
     plt.xlabel('iteration')
     plt.ylabel('loss')
-    plt.savefig('figures/' + name + '__loss.png')
-    plt.close()
+    plt.savefig('figures/' + file_name + '__loss.png')
+
 
 else:
 
     # We can also just load an existing model
-    agent.load(name)
-
-###########
-# plot log loss for one worker
-ts = losses[losses.keys()[0]][0]
-loss = losses[losses.keys()[0]][1]
-
-plt.plot(ts, loss, 'k')
-plt.xlabel('iteration')
-plt.ylabel('loss')
-plt.savefig('figures/' + name + '__loss.png')
-plt.close()
+    agent.load(file_name)
 
 ###########
 # Run agent
 
-# We could load a model directly from disk
-# from chainer import serializers
-# arl.agent.model = serializers.load_npz('models/TestARL_MLP.model')
-
 rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
+###########
+# Analyze run
+
+agent.analyze(rewards, ground_truth, observations, actions, callback = None)
+
 ##########
-# visualize results
+# render results
 
-# plot rewards
-
-plt.plot(range(len(rewards)), np.cumsum(rewards), 'k')
-plt.xlabel('iteration')
-plt.ylabel('cumulative reward')
-plt.savefig('figures/' + name + '__reward.png')
-plt.close()
-
+# agent.render(ground_truth, observations, actions)

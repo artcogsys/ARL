@@ -30,7 +30,7 @@ class ARL(object):
 
         self.learning_rates = kwargs.get('learning_rates', np.logspace(-4,-2,100))
 
-    def learn(self, niter, nprocs = None):
+    def learn(self, niter, nprocs = None, callback = False):
         """
         Learn model parameters based on asynchronous updates of multiple agents
         :param niter: number of training iterations
@@ -90,7 +90,7 @@ class ARL(object):
                 # Agent name is equated with index
                 agent.name = mp.current_process().name
 
-                loss = agent.learn(niter)
+                loss = agent.learn(niter, callback = callback)
 
                 out_q.put({mp.current_process().name : loss})
 

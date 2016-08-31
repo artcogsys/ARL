@@ -4,3 +4,18 @@
 *.xml
 
 *.png
+figures/test_crnn__loss.png
+
+*.png
+
+figures/test_crnn__loss.png
+
+figures/test_crnn__reward.png
+
+figures/test_mlp__loss.png
+
+figures/test_mlp__reward.png
+
+figures/test_mlp__reward.png
+
+*.png

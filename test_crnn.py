@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -7,6 +5,9 @@ import environments
 import modelzoo as mz
 import agents
 from arl import *
+
+# set interactive mode
+plt.ion()
 
 ###########
 # Parameter specification
@@ -18,7 +19,7 @@ learn = True
 nprocs = None
 
 # get file name
-name = os.path.splitext(os.path.basename(__file__))[0]
+file_name = os.path.splitext(os.path.basename(__file__))[0]
 
 train_iter = 2*10**4 # number training iterations
 test_iter = 10**3 # number test iterations
@@ -42,7 +43,7 @@ model = mz.CRNN(env.ninput, nhidden, env.noutput)
 ##########
 # Specify agent
 
-agent = agents.A2C(env, model)
+agent = agents.A2C(env, model, file_name = file_name)
 
 ###########
 # Specify experiment
@@ -54,82 +55,39 @@ arl = ARL(agent)
 
 if learn:
 
-    loss, agent = arl.learn(train_iter, nprocs)
+    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = None)
 
     ###########
     # Save model
 
-    agent.save(name)
+    agent.save(file_name)
 
-    if nprocs != 1: # get log loss for one worker
+    if nprocs != 1:  # get log loss for one worker
         loss = loss[loss.keys()[0]]
 
+    plt.clf()
     plt.plot(loss[0], loss[1], 'k')
     plt.xlabel('iteration')
     plt.ylabel('loss')
-    plt.savefig('figures/' + name + '__loss.png')
-    plt.close()
+    plt.savefig('figures/' + file_name + '__loss.png')
+
 
 else:
 
     # We can also just load an existing model
-    agent.load(name)
+    agent.load(file_name)
 
 ###########
 # Run agent
 
 rewards, ground_truth, observations, actions, done = agent.simulate(test_iter)
 
-##########
-# visualize results
-
 ###########
 # Analyze run
 
-rewards2, log_prob, entropy, value, returns, advantage, advantage_surprise, internal = agent.analyze(ground_truth, observations, actions)
+agent.analyze(rewards, ground_truth, observations, actions, callback = None)
 
 ##########
-# visualize results
+# render results
 
-# sanity check
-plt.plot(range(len(rewards2)), np.cumsum(rewards2), 'k')
-plt.xlabel('iteration')
-plt.ylabel('cumulative reward')
-plt.savefig('figures/' + name + '__reward2.png')
-plt.close()
-
-plt.plot(range(len(log_prob)), log_prob, 'k')
-plt.xlabel('iteration')
-plt.ylabel('log probability')
-plt.savefig('figures/' + name + '__score_function.png')
-plt.close()
-
-plt.plot(range(len(entropy)), entropy, 'k')
-plt.xlabel('iteration')
-plt.ylabel('entropy')
-plt.savefig('figures/' + name + '__entropy.png')
-plt.close()
-
-plt.plot(range(len(value)), value, 'k')
-plt.xlabel('iteration')
-plt.ylabel('value')
-plt.savefig('figures/' + name + '__value.png')
-plt.close()
-
-plt.plot(range(len(returns)), returns, 'k')
-plt.xlabel('iteration')
-plt.ylabel('returns')
-plt.savefig('figures/' + name + '__returns.png')
-plt.close()
-
-plt.plot(range(len(advantage)), advantage, 'k')
-plt.xlabel('iteration')
-plt.ylabel('advantage')
-plt.savefig('figures/' + name + '__advantage.png')
-plt.close()
-
-plt.plot(range(len(advantage_surprise)), advantage_surprise, 'k')
-plt.xlabel('iteration')
-plt.ylabel('surprise')
-plt.savefig('figures/' + name + '__surprise.png')
-plt.close()
+# agent.render(ground_truth, observations, actions)
