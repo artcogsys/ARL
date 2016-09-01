@@ -42,7 +42,7 @@ class ARL(object):
 
         if nprocs == 1:
 
-            loss = self.agent.learn(niter)
+            loss = self.agent.learn(niter, callback = callback)
 
             return loss, self.agent
 

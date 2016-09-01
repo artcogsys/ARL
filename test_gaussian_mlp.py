@@ -35,6 +35,14 @@
 
 # to do: score_function code opschonen / afleiden + numerieke problemen vermijden + exploratie forceren
 
+# how to deal with infinite precision actions? Take physical constraints into account
+
+# how to deal with infinite precision observations?
+
+# can we actually deal with negative rewards only?
+
+# DDPG uses deterministic output and motor noise only for exploration; ...
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -59,7 +67,7 @@ nprocs = None
 # get file name
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 1*10**3 # number training iterations
+train_iter = 1*10**4 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
@@ -71,7 +79,7 @@ env = environments.RandomSample()
 # Actor and critic specification
 
 nhidden = 20
-model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'spherical')
+model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'fixed')
 
 ##########
 # Specify agent
@@ -88,7 +96,7 @@ arl = ARL(agent)
 
 def custom_callback_learning(name, t, losses, action, pi, v, reward):
 
-    if name == 'Process-1':
+    if name == 'Process-1' or name == 'Agent':
 
         if "time" not in custom_callback_learning.__dict__:
 
@@ -98,7 +106,7 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
 
         custom_callback_learning.time.append(t)
         custom_callback_learning.mu.append(pi[0].data[0])
-        custom_callback_learning.sigma2.append(F.softplus(pi[1]).data[0])
+        custom_callback_learning.sigma2.append(F.exp(pi[1]).data[0])
 
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])

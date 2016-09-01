@@ -531,7 +531,7 @@ class RandomSample(Environment):
         # reward should minimize distance to target
         reward = - np.linalg.norm(action - self.state)
 
-        self.state = np.array(np.random.random()-0.5)
+        self.state = 10*np.array(np.random.random()-0.5)
 
         obs = self.state.reshape([1,1]).astype(np.float32)
 

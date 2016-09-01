@@ -350,7 +350,7 @@ class GaussianMLP(Chain):
             super(GaussianMLP, self).__init__(
                 l1=L.Linear(nframes * ninput, nhidden, initialW=init.HeNormal()),
                 mu=L.Linear(nhidden, noutput, initialW=init.HeNormal()),
-                lsigma2=L.Linear(nhidden, 1, initialW=init.Zero()),
+                lsigma2=L.Linear(nhidden, 1, initialW=init.HeNormal()),
                 v=L.Linear(nhidden, 1, initialW=init.HeNormal()),
             )
 
