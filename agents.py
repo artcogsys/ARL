@@ -299,12 +299,14 @@ class A2C(Agent):
 
             mu = pi[0].data[0]
 
-            # create diagonal covariance matrix
+            # softplus variant
             # sigma2 = F.softplus(pi[1])
+            # C = sigma2.data[0] * np.eye(mu.size)
+            # action = np.random.multivariate_normal(mu, C)
+
+            # exponential variant
             sigma2 = F.exp(pi[1])
             C = sigma2.data[0] * np.eye(mu.size)
-
-            # can probably be done in a numerically more stable manner
             action = np.random.multivariate_normal(mu, C)
 
             # action = mu
@@ -334,11 +336,11 @@ class A2C(Agent):
 
         else:
 
-            # # # transform into variance parameter
+            # softplus variant
             # sigma2 = F.softplus(pi[1])
-            #
             # return - F.sum(0.5 * F.log(2 * math.pi * sigma2) + 1, axis=1)
 
+            # exponential variant
             return - F.sum(0.5 * np.log(2 * math.pi) + 0.5 * pi[1] + 1, axis=1)
 
     def score_function(self, action, pi):
@@ -359,33 +361,30 @@ class A2C(Agent):
 
         else:
 
-            # this requires a general formulation in terms of covariances
-            # Covariance might be essential for complex actions? i.e. we need to be able to induce dependencies between actions!!
 
+            # exponential variant
             mu = pi[0]
             log_sigma2 = pi[1]
             sigma2 = F.exp(pi[1])
+            a = Variable(np.asarray([action], dtype=np.float32))
+            a_dif = a - mu
+            v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
+            return F.expand_dims(v,0)
 
-            # sigma2 = F.softplus(pi[1])  # needed for numerical stability
-            #
-            # # contents of F.gaussian_nll
-            # x = Variable(np.asarray([action], dtype=np.float32))
-            # D = x.data.size
-            # log_var = F.log(sigma2)  # expected by gaussian_nll
-            # x_prec = exponential.exp(-log_var)
-            # x_diff = x - mu
-            # x_power = (x_diff * x_diff) * x_prec * -0.5
-            # v = - ((sum.sum(log_var) + D * math.log(2 * math.pi)) / 2 - sum.sum(x_power))
-            #
+            # softplus variant
+            # mu = pi[0]
+            # sigma2 = F.softplus(pi[1])
+            # log_sigma2 = F.log(sigma2)
+            # a = Variable(np.asarray([action], dtype=np.float32))
+            # a_dif = a - mu
+            # v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
+            # return F.expand_dims(v,0)
+
+            # using F.gaussian_nll
             # # sigma2 = F.softplus(pi[1])  # needed for numerical stability
             # # log_var = F.log(sigma2)  # expected by gaussian_nll
             # # v = - F.gaussian_nll(Variable(np.asarray([action], dtype=np.float32)), mu, log_var)
 
-            a = Variable(np.asarray([action], dtype=np.float32))
-            a_dif = a - mu
-            v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
-
-            return F.expand_dims(v,0)
 
 
     def simulate(self, test_iter):

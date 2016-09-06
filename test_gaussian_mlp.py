@@ -43,6 +43,12 @@
 
 # DDPG uses deterministic output and motor noise only for exploration; ...
 
+# Bias term essential?
+
+# Taak misschien klassieker kiezen? episodic;
+# Check mujoco environment en specificatie van reward daar
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -67,7 +73,7 @@ nprocs = None
 # get file name
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 1*10**4 # number training iterations
+train_iter = 1*10**3 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
@@ -78,7 +84,7 @@ env = environments.RandomSample()
 ###########
 # Actor and critic specification
 
-nhidden = 20
+nhidden = 100
 model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'fixed')
 
 ##########

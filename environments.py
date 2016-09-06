@@ -493,6 +493,7 @@ class RandomDotMotion(Environment):
 #######
 ### Continuous output models
 
+
 class RandomSample(Environment):
     """
     Simple continuous control task that is used to test continuous policy learning algorithms
@@ -504,7 +505,7 @@ class RandomSample(Environment):
     def __init__(self):
         super(Environment, self).__init__()
 
-        self.ninput = 1
+        self.ninput = 2 # includes bias term
         self.naction = 1 # number of action variables; predicted (x,y) position of target
         self.noutput = 1 # number of output variables for the agent (continuous case)
         self.nstates = 1 # number of state variables
@@ -521,19 +522,29 @@ class RandomSample(Environment):
 
         """
 
-        self.state = np.array(np.random.random()-0.5)
+        # self.state = np.array(np.random.random()-0.5)
+        self.state = np.array([0])
+
+        # add bias term
+        obs = np.vstack([self.state, np.array([1])]).reshape([1,2]).astype(np.float32)
 
         # return observation
-        return self.state.reshape([1,1]).astype(np.float32)
+        return obs
 
     def step(self, action):
 
         # reward should minimize distance to target
-        reward = - np.linalg.norm(action - self.state)
 
-        self.state = 10*np.array(np.random.random()-0.5)
+        # MAYBE ALL OF THIS ONLY WORKS FOR EPISODIC TASKS
+        # WHERE WE HAVE POSITIVE OR ZERO REWARDS
+        # reward = - np.linalg.norm(action - self.state)
 
-        obs = self.state.reshape([1,1]).astype(np.float32)
+        if np.abs(action - self.state) < 0.01:
+            reward = 1
+        else:
+            reward = 0
+
+        obs = self.reset()
 
         # we are never done...
         done = False
