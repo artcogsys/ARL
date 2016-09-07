@@ -321,6 +321,123 @@ class CRNN(Chain):
 
 ### MODELS WITH CONTINUOUS ACTIONS AS OUTPUT ###
 
+class GaussianLinReg(Chain):
+    """
+    Model implements actor and critic with shared model
+    Here we just have a linear regression model and the value is assumed to be zero always (i.e. no baseline)
+
+    UNFINISHED!
+
+    """
+
+    def __init__(self, ninput, nhidden, noutput, nframes=1, covariance = 'fixed'):
+        """
+
+        :param ninput:
+        :param nhidden:
+        :param noutput: number of action outputs
+        """
+
+        self.covariance = covariance
+
+        if covariance == 'fixed':
+
+            super(GaussianMLP, self).__init__(
+                l1=L.Linear(nframes * ninput, nhidden, initialW=init.HeNormal()),
+                mu=L.Linear(nhidden, noutput, initialW=init.HeNormal()),
+                v=L.Linear(nhidden, 1, initialW=init.HeNormal()),
+            )
+
+        elif covariance == 'spherical':
+
+            super(GaussianMLP, self).__init__(
+                l1=L.Linear(nframes * ninput, nhidden, initialW=init.HeNormal()),
+                mu=L.Linear(nhidden, noutput, initialW=init.HeNormal()),
+                lsigma2=L.Linear(nhidden, 1, initialW=init.HeNormal()),
+                v=L.Linear(nhidden, 1, initialW=init.HeNormal()),
+            )
+
+        else:  # diagonal covariance
+
+            super(GaussianMLP, self).__init__(
+                l1=L.Linear(nframes * ninput, nhidden, initialW=init.HeNormal()),
+                mu=L.Linear(nhidden, noutput, initialW=init.HeNormal()),
+                lsigma2=L.Linear(nhidden, noutput, initialW=init.HeNormal()),
+                v=L.Linear(nhidden, 1, initialW=init.HeNormal()),
+            )
+
+        self.ninput = ninput
+        self.nhidden = nhidden
+        self.noutput = noutput
+        self.nframes = nframes
+
+        self.reset()
+
+        # Note that pi and v define the actor and critic, respectively
+
+    def __call__(self, x, persistent=False, internal_states=False):
+        """
+
+        :param x: sensory input
+        :param persistent: whether or not to retain the internal state (if any)
+        :param internal_states: whether or not to return internal states
+        :return: policy output pi and value v
+        """
+
+        # add stimulus to buffer
+        if self.nframes == 1:
+            h = F.relu(self.l1(Variable(x)))
+        else:
+
+            if persistent:
+                _buffer = self.buffer
+
+            if self.idx >= self.nframes - 1:
+                self.buffer = np.vstack([self.buffer[1:self.nframes], x])
+            else:
+                self.buffer[self.idx] = x
+
+            h = F.relu(self.l1(Variable(self.buffer.reshape([1, self.buffer.size]))))
+
+            if persistent:
+                self.buffer = _buffer
+            else:
+                self.idx += 1
+
+        if self.covariance == 'fixed':
+
+            mu = self.mu(h)
+            lsigma2 = Variable(np.zeros([1, self.noutput]).astype('float32'))
+            v = self.v(h)
+
+        else:
+
+            mu = self.mu(h)
+            lsigma2 = self.lsigma2(h)
+            v = self.v(h)
+
+        if internal_states:
+            return [mu, lsigma2], v, {'hidden state': h.data[0]}
+        else:
+            return [mu, lsigma2], v
+
+    def unchain_backward(self):
+        pass
+
+
+    def reset(self):
+
+        if self.nframes > 1:
+            self.buffer = np.zeros([self.nframes, self.ninput], dtype=np.float32)
+            self.idx = 0
+
+
+    def get_internal(self):
+        """
+        Returns: internal states
+        """
+
+
 class GaussianMLP(Chain):
     """
     Model implements actor and critic with shared model

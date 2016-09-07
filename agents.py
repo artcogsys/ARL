@@ -204,7 +204,7 @@ class A2C(Agent):
 
                 v = self.past_values[i]
 
-                # Compute advantage
+                # Compute advantage (difference between approximation of action-value and value)
                 advantage = R - v
 
                 # get log probability
@@ -300,14 +300,14 @@ class A2C(Agent):
             mu = pi[0].data[0]
 
             # softplus variant
-            # sigma2 = F.softplus(pi[1])
-            # C = sigma2.data[0] * np.eye(mu.size)
-            # action = np.random.multivariate_normal(mu, C)
-
-            # exponential variant
-            sigma2 = F.exp(pi[1])
+            sigma2 = F.softplus(pi[1])
             C = sigma2.data[0] * np.eye(mu.size)
             action = np.random.multivariate_normal(mu, C)
+
+            # exponential variant
+            # sigma2 = F.exp(pi[1])
+            # C = sigma2.data[0] * np.eye(mu.size)
+            # action = np.random.multivariate_normal(mu, C)
 
             # action = mu
 
@@ -337,11 +337,11 @@ class A2C(Agent):
         else:
 
             # softplus variant
-            # sigma2 = F.softplus(pi[1])
-            # return - F.sum(0.5 * F.log(2 * math.pi * sigma2) + 1, axis=1)
+            sigma2 = F.softplus(pi[1])
+            return - F.sum(0.5 * F.log(2 * math.pi * sigma2) + 1, axis=1)
 
             # exponential variant
-            return - F.sum(0.5 * np.log(2 * math.pi) + 0.5 * pi[1] + 1, axis=1)
+            # return - F.sum(0.5 * np.log(2 * math.pi) + 0.5 * pi[1] + 1, axis=1)
 
     def score_function(self, action, pi):
         """
@@ -363,22 +363,22 @@ class A2C(Agent):
 
 
             # exponential variant
-            mu = pi[0]
-            log_sigma2 = pi[1]
-            sigma2 = F.exp(pi[1])
-            a = Variable(np.asarray([action], dtype=np.float32))
-            a_dif = a - mu
-            v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
-            return F.expand_dims(v,0)
-
-            # softplus variant
             # mu = pi[0]
-            # sigma2 = F.softplus(pi[1])
-            # log_sigma2 = F.log(sigma2)
+            # log_sigma2 = pi[1]
+            # sigma2 = F.exp(pi[1])
             # a = Variable(np.asarray([action], dtype=np.float32))
             # a_dif = a - mu
             # v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
             # return F.expand_dims(v,0)
+
+            # softplus variant
+            mu = pi[0]
+            sigma2 = F.softplus(pi[1])
+            log_sigma2 = F.log(sigma2)
+            a = Variable(np.asarray([action], dtype=np.float32))
+            a_dif = a - mu
+            v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
+            return F.expand_dims(v,0)
 
             # using F.gaussian_nll
             # # sigma2 = F.softplus(pi[1])  # needed for numerical stability

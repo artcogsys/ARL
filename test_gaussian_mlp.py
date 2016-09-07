@@ -85,7 +85,7 @@ env = environments.RandomSample()
 # Actor and critic specification
 
 nhidden = 100
-model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'fixed')
+model = mz.GaussianMLP(env.ninput, nhidden, env.noutput, covariance = 'spherical')
 
 ##########
 # Specify agent
@@ -109,10 +109,13 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
             custom_callback_learning.time = []
             custom_callback_learning.sigma2 = []
             custom_callback_learning.mu = []
+            custom_callback_learning.v = []
 
         custom_callback_learning.time.append(t)
         custom_callback_learning.mu.append(pi[0].data[0])
-        custom_callback_learning.sigma2.append(F.exp(pi[1]).data[0])
+#        custom_callback_learning.sigma2.append(F.exp(pi[1]).data[0])
+        custom_callback_learning.sigma2.append(F.softplus(pi[1]).data[0])
+        custom_callback_learning.v.append(v.data[0])
 
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
@@ -124,14 +127,18 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
         #
 
         plt.clf()
-        plt.subplot(211)
+        plt.subplot(311)
         plt.plot(custom_callback_learning.time,custom_callback_learning.mu)
         plt.xlabel('time')
         plt.ylabel('mu')
-        plt.subplot(212)
+        plt.subplot(312)
         plt.plot(custom_callback_learning.time,custom_callback_learning.sigma2)
         plt.xlabel('time')
         plt.ylabel('sigma^2')
+        plt.subplot(313)
+        plt.plot(custom_callback_learning.time,custom_callback_learning.v)
+        plt.xlabel('time')
+        plt.ylabel('V')
         plt.draw()
 #        plt.pause(0.01)
 
@@ -176,7 +183,7 @@ def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_fun
 
 if learn:
 
-    loss, agent = arl.learn(train_iter, nprocs = nprocs, callback = custom_callback_learning)
+    loss, agent = arl.learn(train_iter, nprocs = nprocs) #, callback = custom_callback_learning)
 
     ###########
     # Save model

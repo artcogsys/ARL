@@ -505,7 +505,7 @@ class RandomSample(Environment):
     def __init__(self):
         super(Environment, self).__init__()
 
-        self.ninput = 2 # includes bias term
+        self.ninput = 1 # possibly includes bias term
         self.naction = 1 # number of action variables; predicted (x,y) position of target
         self.noutput = 1 # number of output variables for the agent (continuous case)
         self.nstates = 1 # number of state variables
@@ -522,11 +522,12 @@ class RandomSample(Environment):
 
         """
 
-        # self.state = np.array(np.random.random()-0.5)
-        self.state = np.array([0])
+        self.state = np.array(np.random.random()-0.5)
+        #self.state = np.array([0])
 
         # add bias term
-        obs = np.vstack([self.state, np.array([1])]).reshape([1,2]).astype(np.float32)
+        # obs = np.vstack([self.state, np.array([1])]).reshape([1,2]).astype(np.float32)
+        obs = self.state.reshape([1,1]).astype(np.float32)
 
         # return observation
         return obs
@@ -537,12 +538,14 @@ class RandomSample(Environment):
 
         # MAYBE ALL OF THIS ONLY WORKS FOR EPISODIC TASKS
         # WHERE WE HAVE POSITIVE OR ZERO REWARDS
-        # reward = - np.linalg.norm(action - self.state)
+        reward = - np.linalg.norm(action - self.state)
+        # reward = - np.log(np.linalg.norm(action - self.state))
 
-        if np.abs(action - self.state) < 0.01:
-            reward = 1
-        else:
-            reward = 0
+        #print reward
+        # if np.abs(action - self.state) < 0.01:
+        #     reward = 1
+        # else:
+        #     reward = 0
 
         obs = self.reset()
 
