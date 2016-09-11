@@ -490,7 +490,8 @@ class A2C(Agent):
         value[:] = np.nan
 
         returns = np.zeros([test_iter, 1], dtype=np.float32)
-        returns[:] = np.nan
+
+        done = np.zeros([test_iter, 1], dtype=np.bool)
 
         _internal_states = {}
 
@@ -515,23 +516,12 @@ class A2C(Agent):
             # generate action using actor model
             action, pi, v, internal = self.act(obs, internal_states = True)
 
+            # actor-related regressors
             score_function[i] = self.score_function(action, pi).data
-
-            # perform action via actor and receive new observations and reward
-            obs, reward, done = self.environment.step(actions[i])
-
-            # if done:
-            #     self.model.reset()
-
-            # No reward clipping; will lead to random guessing as best option for our environment
-            # reward = np.clip(reward, -1, 1)
-
-            # store reward and value
-            rewards[i] = reward
-            value[i] = v.data
-
-            # compute entropy
             entropy[i] = self.entropy(pi).data
+
+            # critic-related regressor
+            value[i] = v.data
 
             # initialize internal states
             if i == 0:
@@ -543,21 +533,54 @@ class A2C(Agent):
             for k in internal.keys():
                 _internal_states[k][i] = internal[k]
 
+            # perform action via actor and receive new observations and reward
+            obs, rewards[i], done[i] = self.environment.step(actions[i])
+
+            # if done:
+            #     self.model.reset()
+
+            # No reward clipping; will lead to random guessing as best option for our environment
+            # reward = np.clip(reward, -1, 1)
+
             # For the last step we don't have an observation or ground truth (end of experiment)
             if i < test_iter - 1:
                 env.set_ground_truth(ground_truth[i + 1])
                 obs = observations[i + 1].reshape(obs_shape)
 
-        if done:
-            R = 0
-        else:
-            _, vout = self.model(obs, persistent=True)
-            R = float(vout.data)
+        # if done:
+        #     R = 0
+        # else:
+        #     _, vout = self.model(obs, persistent=True)
+        #     R = float(vout.data)
+        #
+        # for i in range(test_iter-1, -1, -1):
+        #
+        #     R = rewards[i] + self.gamma * R
+        #     returns[i] = R
 
-        for i in range(test_iter-1, -1, -1):
+        # compute value associated with the last produced observation
+        _, vout = self.model(obs, persistent=True)
+        vlast = float(vout.data)
 
-            R = rewards[i] + self.gamma * R
-            returns[i] = R
+        # compute n-step reward as approximation of action-value function for each time point
+        for i in range(test_iter):
+
+            # take at most n steps
+            for j in range(self.t_max):
+
+                idx = i + j
+
+                if idx == test_iter:
+                    returns[i] += self.gamma ** (idx-i) * vlast
+                    break
+
+                if idx > i and done[idx]:
+                    break
+
+                if j == self.t_max - 1:
+                    returns[i] += self.gamma ** (idx-i) * value[idx]
+                else:
+                    returns[i] += self.gamma ** (idx-i) * rewards[i]
 
         advantage = returns - value
         advantage_surprise = advantage**2

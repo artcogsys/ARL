@@ -522,7 +522,7 @@ class RandomSample(Environment):
 
         """
 
-        self.state = np.array(np.random.random()-0.5)
+        self.state = np.array(np.random.random())
         #self.state = np.array([0])
 
         # add bias term
