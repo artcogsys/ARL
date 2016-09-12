@@ -469,10 +469,17 @@ class A2C(Agent):
             value: Output of the critic (estimated value according to current state of the model)
             returns: The expected return at each point in time
             advantage: returns - value
-	        advantage_surprise: squared advantage as a possible measure for surprise
+	        surprise: (V_t - r_t - V_t+1)^2
             _internal_states: internal states (hidden units, cell states, etc.; model dependent)
 
-        Note: Squared advantage could be a measure of surprise?
+        Note:
+            Returns, advantage and surprise are all signals that depend on an n-step look-ahead. This is a signal which is
+            not available to the network/subject at test time.
+
+            We can assume that the network has access to the reward r_t. We also know that V_t = r_t + V_t+1
+            So we can say that the surprise signal at time t+1 is given by (V_t - r_t - V_t+1)^2.
+
+
         """
 
         test_iter = ground_truth.shape[0]
@@ -488,6 +495,9 @@ class A2C(Agent):
 
         value = np.zeros([test_iter, 1], dtype=np.float32)
         value[:] = np.nan
+
+        surprise = np.zeros([test_iter, 1], dtype=np.float32)
+        surprise[:] = np.nan
 
         returns = np.zeros([test_iter, 1], dtype=np.float32)
 
@@ -536,6 +546,10 @@ class A2C(Agent):
             # perform action via actor and receive new observations and reward
             obs, rewards[i], done[i] = self.environment.step(actions[i])
 
+            # compete surprise signal (V_t - r_t - V_t+1)^2
+            if i > 0:
+                surprise[i] = (value[i-1] - rewards[i-1] - value[i])**2
+
             # if done:
             #     self.model.reset()
 
@@ -562,6 +576,8 @@ class A2C(Agent):
         _, vout = self.model(obs, persistent=True)
         vlast = float(vout.data)
 
+        # stuff below are all regressors that require an n-step lookahead!
+
         # compute n-step reward as approximation of action-value function for each time point
         for i in range(test_iter):
 
@@ -583,16 +599,15 @@ class A2C(Agent):
                     returns[i] += self.gamma ** (idx-i) * rewards[i]
 
         advantage = returns - value
-        advantage_surprise = advantage**2
 
         # sanity check so we are sure that analyze is ran on the exact same sequence as simulate
         assert ((rewards == sim_rewards).all())
 
         # callback of analysis function
         if callback is not None:
-            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states)
         else:
-            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states)
 
     def render(self, ground_truth, observations, actions):
         """
@@ -666,7 +681,7 @@ class A2C(Agent):
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
 
-    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
+    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states):
 
         ##########
         # visualize results
@@ -710,7 +725,7 @@ class A2C(Agent):
         plt.savefig('figures/' + file_name + '__advantage.png')
 
         plt.clf()
-        plt.plot(range(len(advantage_surprise)), advantage_surprise, 'k')
+        plt.plot(range(len(surprise)), surprise, 'k')
         plt.xlabel('iteration')
         plt.ylabel('surprise')
         plt.savefig('figures/' + file_name + '__surprise.png')
