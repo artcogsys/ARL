@@ -142,9 +142,9 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
         plt.draw()
 #        plt.pause(0.01)
 
-def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states):
+def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate):
 
-    agent.callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states)
+    agent.callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate)
 
     # plot distances between ground truth and action
 

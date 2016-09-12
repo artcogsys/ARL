@@ -471,6 +471,7 @@ class A2C(Agent):
             advantage: returns - value
 	        surprise: (V_t - r_t - V_t+1)^2
             _internal_states: internal states (hidden units, cell states, etc.; model dependent)
+	        pstate: probabilistic state estimate according to generative model (not part of the neural net!)
 
         Note:
             Returns, advantage and surprise are all signals that depend on an n-step look-ahead. This is a signal which is
@@ -503,6 +504,9 @@ class A2C(Agent):
 
         done = np.zeros([test_iter, 1], dtype=np.bool)
 
+        pstate = np.zeros([test_iter, 1], dtype=np.float32)
+        pstate[:] = np.nan
+
         _internal_states = {}
 
         ###
@@ -522,6 +526,8 @@ class A2C(Agent):
         self.model.reset()
 
         for i in xrange(test_iter):
+
+            pstate[i] = self.environment.get_pstate()
 
             # generate action using actor model
             action, pi, v, internal = self.act(obs, internal_states = True)
@@ -605,9 +611,9 @@ class A2C(Agent):
 
         # callback of analysis function
         if callback is not None:
-            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states)
+            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate)
         else:
-            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states)
+            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate)
 
     def render(self, ground_truth, observations, actions):
         """
@@ -681,52 +687,61 @@ class A2C(Agent):
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
 
-    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states):
+    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate):
 
         ##########
         # visualize results
 
         # plot rewards
 
+        t = range(len(rewards))
+
         plt.clf()
-        plt.plot(range(len(rewards)), np.cumsum(rewards), 'k')
+        plt.plot(t, np.cumsum(rewards), 'k')
         plt.xlabel('iteration')
         plt.ylabel('cumulative reward')
         plt.savefig('figures/' + file_name + '__reward.png')
 
         plt.clf()
-        plt.plot(range(len(score_function)), score_function, 'k')
+        plt.plot(t, score_function, 'k')
         plt.xlabel('iteration')
         plt.ylabel('score_function')
         plt.savefig('figures/' + file_name + '__score_function.png')
 
         plt.clf()
-        plt.plot(range(len(entropy)), entropy, 'k')
+        plt.plot(t, entropy, 'k')
         plt.xlabel('iteration')
         plt.ylabel('entropy')
         plt.savefig('figures/' + file_name + '__entropy.png')
 
         plt.clf()
-        plt.plot(range(len(value)), value, 'k')
+        plt.plot(t, value, 'k')
         plt.xlabel('iteration')
         plt.ylabel('value')
         plt.savefig('figures/' + file_name + '__value.png')
 
         plt.clf()
-        plt.plot(range(len(returns)), returns, 'k')
+        plt.plot(t, returns, 'k')
         plt.xlabel('iteration')
         plt.ylabel('returns')
         plt.savefig('figures/' + file_name + '__returns.png')
 
         plt.clf()
-        plt.plot(range(len(advantage)), advantage, 'k')
+        plt.plot(t, advantage, 'k')
         plt.xlabel('iteration')
         plt.ylabel('advantage')
         plt.savefig('figures/' + file_name + '__advantage.png')
 
         plt.clf()
-        plt.plot(range(len(surprise)), surprise, 'k')
+        plt.plot(t, surprise, 'k')
         plt.xlabel('iteration')
         plt.ylabel('surprise')
         plt.savefig('figures/' + file_name + '__surprise.png')
+        plt.close()
+
+        plt.clf()
+        plt.plot(t, pstate, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('pstate')
+        plt.savefig('figures/' + file_name + '__pstate.png')
         plt.close()

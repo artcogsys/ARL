@@ -35,6 +35,9 @@ class Environment(object):
     def generate(self):
         pass
 
+    def get_pstate(self):
+        return 0.5
+
 
 ###
 # Specific environments
@@ -185,6 +188,10 @@ class ProbabilisticCategorization(Environment):
 
         self.state = np.random.randint(1, 3)  # 1 = left, 2 = right
 
+        # running estimate of state uncertainty according to generative model:
+        # p(s = i | o1,...,on) \propto p(o1,...,on | s=i) p(s=i) \propto p(o1|s=i) * ... * p(on | s=i)
+        self.pstate = np.array([0.5, 0.5])
+
         return np.zeros([1, self.ninput], dtype='float32')
 
 
@@ -207,6 +214,9 @@ class ProbabilisticCategorization(Environment):
 
             obs = np.zeros([1, self.ninput], dtype='float32')
             obs[0, evidence] = 1
+
+            self.pstate[0] = self.pstate[0] * self.p[evidence]
+            self.pstate[1] = self.pstate[1] * self.q[evidence]
 
             done = False
 
@@ -252,6 +262,14 @@ class ProbabilisticCategorization(Environment):
 
         return gen_seq
 
+    def get_pstate(self):
+        """
+
+        Returns: running estimate of the uncertainty of the state based on the observations
+
+        """
+
+        return self.pstate[0]/(np.sum(self.pstate))
 
 
 class WeatherPrediction(Environment):
