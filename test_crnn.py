@@ -66,9 +66,14 @@ if learn:
         loss = loss[loss.keys()[0]]
 
     plt.clf()
+    plt.subplot(211)
     plt.plot(loss[0], loss[1], 'k')
     plt.xlabel('iteration')
-    plt.ylabel('loss')
+    plt.ylabel('actor loss')
+    plt.subplot(212)
+    plt.plot(loss[0], loss[2], 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('critic loss')
     plt.savefig('figures/' + file_name + '__loss.png')
 
 

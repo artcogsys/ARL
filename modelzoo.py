@@ -224,9 +224,21 @@ class RNN(Chain):
         v = self.v(h)
 
         if internal_states:
+
             c = self.l1.c
-            a, i, f, o = lstm._extract_gates(
-                self.l1.upward.b.data.reshape(1, 4 * c.data.size, 1))
+
+            #a, i, f, o = lstm._extract_gates(
+            #    self.l1.upward.b.data.reshape(1, 4 * c.data.size, 1))
+
+            # relies on manual redefinition of activation/lstm.py and connection/lstm.py!
+            # activation/lstm.py line 87: return self.c, h, self.a, self.i, self.f, self.o
+            # connection/lstm.py, line 171: self.c, self.h, self.a, self.i, self.f, self.o = lstm.lstm(self.c, lstm_in)
+
+            # to be implemented!
+            a = np.array([0]) # self.l1.a
+            i = np.array([0]) # self.l1.i
+            f = np.array([0]) # self.l1.f
+            o = np.array([0]) # self.l1.o
 
         if persistent:
             self.set_persistent(_c, _h)

@@ -142,7 +142,8 @@ class A2C(Agent):
         learning_rates = np.linspace(self.optimizer.lr, 0, niter, False)
 
         # outer training loop
-        losses = []
+        pi_losses = []
+        v_losses = []
         ts = []
         t_start = t = 0
         while True:
@@ -224,9 +225,11 @@ class A2C(Agent):
 
             # Perform (a)synchronous updating
 
+            v_loss = F.reshape(v_loss, pi_loss.data.shape)
+
             # Compute total loss
             # 0.5 supposedly used by Mnih et al
-            loss = pi_loss + 0.5 * F.reshape(v_loss, pi_loss.data.shape)
+            loss = pi_loss + 0.5 * v_loss
 
             # Normalization of the loss of sequences truncated by terminal states
             # NOTE: This causes instabilities; may be solvable by scaling learning rate appropriately
@@ -256,16 +259,18 @@ class A2C(Agent):
             if t >= niter:
                 break
 
-            losses.append(loss.data[0])
+            pi_losses.append(pi_loss.data[0])
+            v_losses.append(v_loss.data[0])
+
             ts.append(t)
 
             # callback during training
             if callback is not None:
-                callback(self.name, t, losses, action, pi, v, reward)
+                callback(self.name, t, pi_losses, v_losses, action, pi, v, reward)
             else:
-                self.callback_learn(self.name, t, losses, action, pi, v, reward)
+                self.callback_learn(self.name, t, pi_losses, v_losses, action, pi, v, reward)
 
-        return [ts, losses]
+        return [ts, pi_losses, v_losses]
 
     def act(self, obs, internal_states = False):
         """
@@ -668,7 +673,7 @@ class A2C(Agent):
                 obs = observations[i + 1].reshape(obs_shape)
 
 
-    def callback_learn(self, name, t, losses, action, pi, v, reward):
+    def callback_learn(self, name, t, pi_losses, v_losses, action, pi, v, reward):
         """
         Default callback function to check properties during learning
 
@@ -685,7 +690,7 @@ class A2C(Agent):
         """
 
         # rough indication of how the loss changes
-        print '{0}; {1}; {2:03.5f}'.format(t, name, losses[-1])
+        print '{0}; {1}; {2:03.5f}'.format(t, name, pi_losses[-1]+0.5*v_losses[-1])
 
     def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate):
 
