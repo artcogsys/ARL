@@ -557,9 +557,9 @@ class A2C(Agent):
             # perform action via actor and receive new observations and reward
             obs, rewards[i], done[i] = self.environment.step(actions[i])
 
-            # compete surprise signal (V_t - r_t - V_t+1)^2
+            # compute surprise signal (V_t - r_t - gamma * V_t+1)^2
             if i > 0:
-                surprise[i] = (value[i-1] - rewards[i-1] - value[i])**2
+                surprise[i] = (value[i-1] - rewards[i-1] - self.gamma * value[i])**2
 
             # if done:
             #     self.model.reset()
