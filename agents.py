@@ -538,7 +538,7 @@ class A2C(Agent):
             action, pi, v, internal = self.act(obs, internal_states = True)
 
             # actor-related regressors
-            score_function[i] = self.score_function(action, pi).data
+            score_function[i] = self.score_function(actions[i], pi).data
             entropy[i] = self.entropy(pi).data
 
             # critic-related regressor
