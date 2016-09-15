@@ -538,7 +538,7 @@ class A2C(Agent):
             action, pi, v, internal = self.act(obs, internal_states = True)
 
             # actor-related regressors
-            score_function[i] = self.score_function(actions[i], pi).data
+            score_function[i] = self.score_function(actions[i][0], pi).data
             entropy[i] = self.entropy(pi).data
 
             # critic-related regressor
@@ -749,4 +749,13 @@ class A2C(Agent):
         plt.xlabel('iteration')
         plt.ylabel('pstate')
         plt.savefig('figures/' + file_name + '__pstate.png')
+        plt.close()
+
+        plt.clf()
+        PE = rewards[0:-1] + self.gamma * value[1:] - value[0:-1]
+        PE = np.append(PE,0)
+        plt.plot(t, PE, 'k')
+        plt.xlabel('iteration')
+        plt.ylabel('prediction error')
+        plt.savefig('figures/' + file_name + '__prediction_error.png')
         plt.close()
