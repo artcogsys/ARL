@@ -751,6 +751,7 @@ class A2C(Agent):
         plt.savefig('figures/' + file_name + '__pstate.png')
         plt.close()
 
+        # compute reward prediction error
         plt.clf()
         PE = rewards[0:-1] + self.gamma * value[1:] - value[0:-1]
         PE = np.append(PE,0)
@@ -759,3 +760,18 @@ class A2C(Agent):
         plt.ylabel('prediction error')
         plt.savefig('figures/' + file_name + '__prediction_error.png')
         plt.close()
+
+        # compute correlation between uncertain state and network states
+        for k in _internal_states.keys():
+
+            s = _internal_states[k]
+            R = np.corrcoef(np.hstack([pstate,s]).transpose())
+            R = R[0,1:]
+
+            plt.clf()
+            plt.bar(np.arange(R.size)+1,R)
+            plt.xlabel('unit')
+            plt.ylabel('r')
+            plt.title(k)
+            plt.savefig('figures/' + file_name + '__uncertainty_' + k + '.png')
+            plt.close()
