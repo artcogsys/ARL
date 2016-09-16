@@ -92,6 +92,13 @@ if learn:
     plt.title('Critic')
     plt.savefig('figures/' + file_name + '__loss.png')
 
+    # loss[3] is the reward gained at *each* iteration
+    plt.clf()
+    plt.plot(range(loss[3].size), np.cumsum(loss[3]), 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('cumulative reward')
+    plt.savefig('figures/' + file_name + '__learning_reward.png')
+
 
 else:
 

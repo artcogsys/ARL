@@ -141,6 +141,10 @@ class A2C(Agent):
         # create trajectory of learning rates
         learning_rates = np.linspace(self.optimizer.lr, 0, niter, False)
 
+        # keep track of gained rewards
+        rewards = np.zeros([niter, 1], dtype=np.float32)
+        rewards[:] = np.nan
+
         # outer training loop
         pi_losses = []
         v_losses = []
@@ -177,6 +181,9 @@ class A2C(Agent):
                 # perform action via actor and receive new observations and reward
                 obs, reward, done = self.environment.step(action)
 
+                # store rewards
+                rewards[t] = reward
+
                 # if done:
                 #     self.model.reset()
 
@@ -189,7 +196,7 @@ class A2C(Agent):
 
                 t += 1
 
-                if done or idx == (self.t_max - 1):
+                if done or idx == (self.t_max - 1) or t >= niter:
                     break
 
             if done:
@@ -266,11 +273,11 @@ class A2C(Agent):
 
             # callback during training
             if callback is not None:
-                callback(self.name, t, pi_losses, v_losses, action, pi, v, reward)
+                callback(self.name, t, pi_losses, v_losses, action, pi, v, rewards)
             else:
-                self.callback_learn(self.name, t, pi_losses, v_losses, action, pi, v, reward)
+                self.callback_learn(self.name, t, pi_losses, v_losses, action, pi, v, rewards)
 
-        return [ts, pi_losses, v_losses]
+        return [ts, pi_losses, v_losses, rewards]
 
     def act(self, obs, internal_states = False):
         """
@@ -673,7 +680,7 @@ class A2C(Agent):
                 obs = observations[i + 1].reshape(obs_shape)
 
 
-    def callback_learn(self, name, t, pi_losses, v_losses, action, pi, v, reward):
+    def callback_learn(self, name, t, pi_losses, v_losses, action, pi, v, rewards):
         """
         Default callback function to check properties during learning
 
@@ -683,7 +690,7 @@ class A2C(Agent):
             losses: loss trajectory
             pi: current policy output
             v: current value output
-            reward: current reward
+            reward: accumulated rewards
 
         Returns:
 
