@@ -141,9 +141,14 @@ class A2C(Agent):
         # create trajectory of learning rates
         learning_rates = np.linspace(self.optimizer.lr, 0, niter, False)
 
-        # keep track of gained rewards
+        # keep track of gained rewards and actions
         rewards = np.zeros([niter, 1], dtype=np.float32)
         rewards[:] = np.nan
+        if self.discrete:
+            actions = np.zeros([niter, self.environment.naction], dtype=np.uint8)
+        else:
+            actions = np.zeros([niter, self.environment.naction], dtype=np.float32)
+        actions[:] = np.nan
 
         # outer training loop
         pi_losses = []
@@ -181,8 +186,9 @@ class A2C(Agent):
                 # perform action via actor and receive new observations and reward
                 obs, reward, done = self.environment.step(action)
 
-                # store rewards
+                # store rewards and actions
                 rewards[t] = reward
+                actions[t] = action
 
                 # if done:
                 #     self.model.reset()
@@ -277,7 +283,7 @@ class A2C(Agent):
             else:
                 self.callback_learn(self.name, t, pi_losses, v_losses, action, pi, v, rewards)
 
-        return [ts, pi_losses, v_losses, rewards]
+        return [ts, pi_losses, v_losses, rewards, actions]
 
     def act(self, obs, internal_states = False):
         """
@@ -387,9 +393,9 @@ class A2C(Agent):
             mu = pi[0]
             sigma2 = F.softplus(pi[1])
             log_sigma2 = F.log(sigma2)
-            a = Variable(np.asarray([action], dtype=np.float32))
+            a = Variable(np.asarray([action], dtype=np.float32).reshape([1,1]))
             a_dif = a - mu
-            v = -0.5 * F.sum(log_sigma2) -0.5 * F.sum(1.0/sigma2 * a_dif * a_dif)
+            v = - 0.5 * F.sum(log_sigma2) - 0.5 * F.sum((1.0/sigma2) * a_dif * a_dif)
             return F.expand_dims(v,0)
 
             # using F.gaussian_nll
@@ -619,13 +625,13 @@ class A2C(Agent):
         advantage = returns - value
 
         # sanity check so we are sure that analyze is ran on the exact same sequence as simulate
-        assert ((rewards == sim_rewards).all())
+#        assert ((rewards == sim_rewards).all())
 
         # callback of analysis function
         if callback is not None:
-            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate)
+            callback(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate, done, observations)
         else:
-            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate)
+            self.callback_analyze(self.file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate, done, observations)
 
     def render(self, ground_truth, observations, actions):
         """
@@ -699,7 +705,7 @@ class A2C(Agent):
         # rough indication of how the loss changes
         print '{0}; {1}; {2:03.5f}'.format(t, name, pi_losses[-1]+0.5*v_losses[-1])
 
-    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate):
+    def callback_analyze(self, file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, surprise, _internal_states, pstate, done, observations):
 
         ##########
         # visualize results
@@ -782,3 +788,31 @@ class A2C(Agent):
             plt.title(k)
             plt.savefig('figures/' + file_name + '__uncertainty_' + k + '.png')
             plt.close()
+
+        # analyze the distribution of value over different symbols
+        # plt.clf()
+        # nsymb = observations.shape[1]
+        # for i in range(nsymb):
+        #     plt.subplot(nsymb,1,i+1)
+        #     idx = observations[:,i] == 1
+        #     plt.hist(value[idx])
+        #     plt.xlim([-0.5,0.5])
+        #     plt.title('symbol ' + str(i+1))
+        #
+        # plt.savefig('figures/' + file_name + '__symbol_value' + '.png')
+        # plt.close()
+
+        # analyze the distribution of value as a function of which symbol we are looking at in the sequence
+        # plt.clf()
+        # nsymb = observations.shape[1]
+        # nstep = 3
+        # for i in range(nsymb):
+        #     for j in range(nstep):
+        #         plt.subplot(nsymb, nstep, j + 1 + i*nstep)
+        #         idx = np.logical_and(observations[:, i].reshape([done.size,1]) == 1,np.roll(done,-j) == 1)
+        #         plt.hist(value[idx])
+        #         plt.xlim([-0.5, 0.5])
+        #         plt.title('symbol ' + str(i + 1) + ' step ' + str(j))
+        #
+        # plt.savefig('figures/' + file_name + '__symbol_value_sequential' + '.png')
+        # plt.close()

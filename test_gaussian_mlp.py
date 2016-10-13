@@ -73,13 +73,13 @@ nprocs = None
 # get file name
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 1*10**3 # number training iterations
+train_iter = 3*10**3 # number training iterations
 test_iter = 10**3 # number test iterations
 
 ###########
 # Environment specification
 
-env = environments.RandomSample()
+env = environments.Constant()
 
 ###########
 # Actor and critic specification
@@ -142,9 +142,9 @@ def custom_callback_learning(name, t, losses, action, pi, v, reward):
         plt.draw()
 #        plt.pause(0.01)
 
-def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate):
+def custom_callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate, done, observations):
 
-    agent.callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate)
+    agent.callback_analyze(file_name, ground_truth, actions, rewards, score_function, entropy, value, returns, advantage, advantage_surprise, _internal_states, pstate, done, observations)
 
     # plot distances between ground truth and action
 
@@ -212,6 +212,13 @@ if learn:
     plt.xlabel('iteration')
     plt.ylabel('cumulative reward')
     plt.savefig('figures/' + file_name + '__learning_reward.png')
+
+    # loss[4] is the action gained at *each* iteration
+    plt.clf()
+    plt.plot(range(loss[4].size), np.cumsum(loss[4]), 'k')
+    plt.xlabel('iteration')
+    plt.ylabel('cumulative reward')
+    plt.savefig('figures/' + file_name + '__learning_action.png')
 
 else:
 

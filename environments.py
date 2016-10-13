@@ -511,6 +511,70 @@ class RandomDotMotion(Environment):
 #######
 ### Continuous output models
 
+class Constant(Environment):
+    """
+    Simplest model to test bugs; network needs to reconstruct the state, which is always 1
+
+    """
+
+    def __init__(self):
+        super(Environment, self).__init__()
+
+        self.ninput = 1 # possibly includes bias term
+        self.naction = 1 # number of action variables; predicted (x,y) position of target
+        self.noutput = 1 # number of output variables for the agent (continuous case)
+        self.nstates = 1 # number of state variables
+
+        self.reset()
+
+        # Figure handle
+        self.fig = None
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        self.state = np.array([1])
+
+        obs = self.state.reshape([1, 1]).astype(np.float32)
+
+        # return observation
+        return obs
+
+    def step(self, action):
+
+        # reward should minimize distance to target
+        reward = np.log(1./np.linalg.norm(action - self.state))
+
+        # if np.abs(action - self.state) < 0.01:
+        #     reward = 1
+        # else:
+        #     reward = 0
+
+        obs = self.reset()
+
+        # we are never done...
+        done = False
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth
+
 
 class RandomSample(Environment):
     """
