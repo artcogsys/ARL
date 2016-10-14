@@ -775,19 +775,19 @@ class A2C(Agent):
         plt.close()
 
         # compute correlation between uncertain state and network states
-        for k in _internal_states.keys():
-
-            s = _internal_states[k]
-            R = np.corrcoef(np.hstack([pstate,s]).transpose())
-            R = R[0,1:]
-
-            plt.clf()
-            plt.bar(np.arange(R.size)+1,R)
-            plt.xlabel('unit')
-            plt.ylabel('r')
-            plt.title(k)
-            plt.savefig('figures/' + file_name + '__uncertainty_' + k + '.png')
-            plt.close()
+        # for k in _internal_states.keys():
+        #
+        #     s = _internal_states[k]
+        #     R = np.corrcoef(np.hstack([pstate,s]).transpose())
+        #     R = R[0,1:]
+        #
+        #     plt.clf()
+        #     plt.bar(np.arange(R.size)+1,R)
+        #     plt.xlabel('unit')
+        #     plt.ylabel('r')
+        #     plt.title(k)
+        #     plt.savefig('figures/' + file_name + '__uncertainty_' + k + '.png')
+        #     plt.close()
 
         # analyze the distribution of value over different symbols
         # plt.clf()

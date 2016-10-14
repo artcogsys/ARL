@@ -21,8 +21,8 @@ nprocs = None
 # get file name
 file_name = os.path.splitext(os.path.basename(__file__))[0]
 
-train_iter = 2*10**4 # number training iterations
-test_iter = 10**3 # number test iterations
+train_iter = 2*10**2 # number training iterations
+test_iter = 10**2 # number test iterations
 
 ###########
 # Environment specification
