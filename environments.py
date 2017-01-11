@@ -13,6 +13,7 @@ class Environment(object):
 
     def reset(self):
         """
+        Reset environment and return observation
 
         Returns: observation
 
@@ -21,12 +22,26 @@ class Environment(object):
         pass
 
     def step(self, action):
+        """
+        Take one step based on an agent's action
+
+        Args:
+            action:
+
+        Returns: observation
+
+        """
+
         pass
 
     def render(self):
+        # render the environment
+
         pass
 
     def get_ground_truth(self):
+        # return ground truth state
+
         pass
 
     def set_ground_truth(self, ground_truth):
@@ -234,7 +249,8 @@ class ProbabilisticCategorization(Environment):
         return obs, reward, done
 
 
-    def generate(self, num_steps, num_obs_per_step, outfilename = ""):    
+    def generate(self, num_steps, num_obs_per_step, outfilename = ""):
+
         print "Generating sequence of", str(num_steps), "steps and", str(num_obs_per_step), "observations."
 
         gen_seq = np.zeros([num_steps, num_obs_per_step + 1 ])
@@ -883,3 +899,72 @@ class Tracking2D(Environment):
         plt.imshow(self.obs_screen, cmap='Greys_r', interpolation='nearest')
         self.fig.canvas.draw()
 
+#######
+### Classical cognitive tasks
+
+class Foo(Environment):
+    """
+    Very simple environment for testing fully observed models. The actor gets a reward when it correctly decides
+    on the ground truth. Ground truth 0/1 determines probabilistically the number of 0s or 1s on the output
+    """
+
+    def __init__(self, n, p = 0.8):
+        """
+
+        Args:
+            n: number of inputs
+            p: probability of emitting the right sensation at the input
+        """
+
+        super(Foo, self).__init__()
+
+        self.ninput = n
+        self.p = p
+
+        self.naction = 1 # number of action variables
+        self.noutput = 2 # number of output variables for the agent (discrete case)
+        self.nstates = 1 # number of state variables
+
+        self.reset()
+
+    def reset(self):
+        """
+
+        Returns: observation
+
+        """
+
+        self.state = np.random.randint(0, 2)
+
+        p = np.array([1 - self.p, self.p])
+
+        if self.state == 0:
+            p = 1 - p
+
+        obs = np.random.choice(2, [1, self.ninput], True, p)
+
+        return obs.astype(np.float32)
+
+    def step(self, action):
+
+        # reward is +1 or -1
+        reward = 2 * int(action == self.state) - 1
+
+        obs = self.reset()
+        done = True
+
+        return obs, reward, done
+
+    def get_ground_truth(self):
+        """
+        Returns: ground truth state of the environment
+        """
+
+        return self.state
+
+    def set_ground_truth(self, ground_truth):
+        """
+        :param: ground_truth : sets ground truth state of the environment
+        """
+
+        self.state = ground_truth

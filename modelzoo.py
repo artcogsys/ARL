@@ -265,6 +265,40 @@ class RNN(Chain):
         if not self.l1.c is None:
             self.l1.c.unchain_backward()
 
+class Elman(Chain):
+    """
+    Elman network
+    """
+
+    def __init__(self, ninput, nhidden, noutput):
+        super(Elman, self).__init__(
+            l1=L.Linear(ninput+nhidden, nhidden, wscale=np.sqrt(2)),
+            pi = L.Linear(nhidden, noutput, initialW=init.HeNormal()),
+            v = L.Linear(nhidden, 1, initialW=init.HeNormal()),
+        )
+        self.topdown1 = Variable(np.zeros((1,nhidden)).astype(np.float32), volatile='auto')
+        self.h=[]
+
+    def __call__(self, x, persistent=False, internal_states=False):
+
+        z = F.concat([x, self.topdown1])
+        self.h = F.relu(self.l1(z))
+
+        pi = self.pi(self.h)
+        v = self.v(self.h)
+
+        self.topdown1 = self.h
+
+        if internal_states:
+            return pi, v, {'hidden state': self.h.data[0]}
+        else:
+            return pi, v
+
+    def reset(self):
+        self.topdown1 = Variable(np.zeros(self.topdown1.data.shape).astype(np.float32), volatile='auto')
+
+    def unchain_backward(self):
+        pass
 
 class CRNN(Chain):
     """
