@@ -144,11 +144,8 @@ class A2C(Agent):
         # keep track of gained rewards and actions
         rewards = np.zeros([niter, 1], dtype=np.float32)
         rewards[:] = np.nan
-        if self.discrete:
-            actions = np.zeros([niter, self.environment.naction], dtype=np.uint8)
-        else:
-            actions = np.zeros([niter, self.environment.naction], dtype=np.float32)
-        actions[:] = np.nan
+	actions = np.zeros([niter, self.environment.naction], dtype=np.float32)
+	actions[:] = np.nan
 
         # outer training loop
         pi_losses = []
@@ -429,12 +426,8 @@ class A2C(Agent):
 
         observations = np.zeros(np.hstack([test_iter, self.ninput]), dtype=np.float32)
         observations[:] = np.nan
-
-        if self.discrete:
-            actions = np.zeros([test_iter, env.naction], dtype=np.uint8)
-        else:
-            actions = np.zeros([test_iter, env.naction], dtype=np.float32)
-        actions[:] = np.nan
+	actions = np.zeros([test_iter, env.naction], dtype=np.float32)
+	actions[:] = np.nan
 
         rewards = np.zeros([test_iter, 1], dtype=np.float32)
         rewards[:] = np.nan
